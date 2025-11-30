@@ -36,7 +36,13 @@ This creates a unique dynamic where players must balance their own game while co
 ### Phase 1: Core Gameplay (MVP)
 **Status:** In Development
 
-- [x] **Guest Play**
+- [x] **Basic Page Structure** ✅ (Completed: Dec 2024)
+  - Landing page with Bughouse rules and history
+  - New game creation page with LiveView
+  - Responsive navigation header
+  - Comprehensive game information and strategies
+
+- [ ] **Guest Play**
   - Create games without an account
   - Share invite links with 3 other players
   - Join games via unique invite codes

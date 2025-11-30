@@ -35,37 +35,36 @@ defmodule BughouseWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="navbar px-4 sm:px-6 lg:px-8">
+    <header class="navbar bg-base-200 shadow-lg px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
-        <a href="/" class="flex-1 flex w-fit items-center gap-2">
-          <img src={~p"/images/logo.svg"} width="36" />
-          <span class="text-sm font-semibold">v{Application.spec(:phoenix, :vsn)}</span>
+        <a href="/" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <span class="text-3xl">♟️</span>
+          <span class="text-xl font-bold">Bughouse Chess</span>
         </a>
       </div>
       <div class="flex-none">
-        <ul class="flex flex-column px-1 space-x-4 items-center">
+        <ul class="menu menu-horizontal px-1 space-x-2">
           <li>
-            <a href="https://phoenixframework.org/" class="btn btn-ghost">Website</a>
+            <a href="/" class="btn btn-ghost">
+              <.icon name="hero-home" class="w-5 h-5" />
+              <span class="hidden sm:inline">Home</span>
+            </a>
           </li>
           <li>
-            <a href="https://github.com/phoenixframework/phoenix" class="btn btn-ghost">GitHub</a>
+            <a href="/game/new" class="btn btn-ghost">
+              <.icon name="hero-plus-circle" class="w-5 h-5" />
+              <span class="hidden sm:inline">New Game</span>
+            </a>
           </li>
           <li>
             <.theme_toggle />
-          </li>
-          <li>
-            <a href="https://hexdocs.pm/phoenix/overview.html" class="btn btn-primary">
-              Get Started <span aria-hidden="true">&rarr;</span>
-            </a>
           </li>
         </ul>
       </div>
     </header>
 
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
-        {render_slot(@inner_block)}
-      </div>
+    <main class="min-h-screen">
+      {render_slot(@inner_block)}
     </main>
 
     <.flash_group flash={@flash} />

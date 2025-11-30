@@ -460,6 +460,14 @@ fly deploy
 
 ## Current Focus (Phase 1)
 
+### Completed
+- **Task 1.3: Basic Page Structure** ✅
+  - Landing page with Bughouse rules and history (`lib/bughouse_web/controllers/page_html/home.html.heex`)
+  - New game creation page using LiveView (`lib/bughouse_web/live/game_new_live.ex`)
+  - Navigation header with Home and New Game links
+  - Responsive design with Tailwind CSS
+  - Route: `/game/new` for game creation
+
 ### In Progress
 - Chess engine implementation (Milestone 3)
 - Board representation and move validation
@@ -469,6 +477,7 @@ fly deploy
 - Bughouse-specific mechanics (Milestone 4)
 - Real-time gameplay UI (Milestone 5)
 - Guest play functionality
+- Lobby system for game waiting room
 
 ### Not Yet Started
 - User authentication (Phase 2)
