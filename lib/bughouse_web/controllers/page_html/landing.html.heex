@@ -1,0 +1,50 @@
+<div class="min-h-screen bg-base-100">
+  <div class="container mx-auto px-4 py-16">
+    <div class="text-center">
+      <h1 class="text-5xl font-bold mb-4">Bughouse Chess</h1>
+      <p class="text-xl text-base-content/70 mb-8">
+        Experience the excitement of 2v2 chess with real-time piece transfers
+      </p>
+
+      <div class="mb-12">
+        <p class="text-lg mb-4">
+          Bughouse is a fast-paced chess variant where teams of two play on separate boards,
+          and captured pieces transfer to your teammate for placement on their board.
+        </p>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        <a href={~p"/game/new"} class="btn btn-primary btn-lg">
+          Create New Game
+        </a>
+
+        <button class="btn btn-outline btn-lg" disabled>
+          Join Game (Coming Soon)
+        </button>
+      </div>
+
+      <div class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+        <div class="card bg-base-200">
+          <div class="card-body">
+            <h3 class="card-title">Team Play</h3>
+            <p>Play with a partner in exciting 2v2 matches</p>
+          </div>
+        </div>
+
+        <div class="card bg-base-200">
+          <div class="card-body">
+            <h3 class="card-title">Piece Transfer</h3>
+            <p>Captured pieces become available for your teammate</p>
+          </div>
+        </div>
+
+        <div class="card bg-base-200">
+          <div class="card-body">
+            <h3 class="card-title">Real-time</h3>
+            <p>Fast-paced gameplay with live updates</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
