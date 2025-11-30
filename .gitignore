@@ -35,3 +35,6 @@ bughouse-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# maybe we can add this back later when its useful
+.idea/
+

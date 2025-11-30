@@ -1,0 +1,101 @@
+<div class="min-h-screen bg-base-100">
+  <div class="container mx-auto px-4 py-8">
+    <div class="mb-6">
+      <a href={~p"/"} class="btn btn-ghost">
+        ← Back to Home
+      </a>
+    </div>
+
+    <div class="max-w-2xl mx-auto">
+      <h1 class="text-4xl font-bold mb-8 text-center">Create New Bughouse Game</h1>
+
+      <div class="card bg-base-200">
+        <div class="card-body">
+          <h2 class="card-title mb-4">Game Setup</h2>
+
+          <p class="mb-6">
+            Create a new Bughouse chess game and invite 3 other players to join.
+            You'll receive an invite code to share with your friends.
+          </p>
+
+          <div class="space-y-4 mb-6">
+            <div class="alert alert-info">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                class="stroke-current shrink-0 w-6 h-6"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div>
+                <h3 class="font-bold">4 Players Required</h3>
+                <div class="text-sm">Bughouse requires exactly 4 players (2 teams of 2)</div>
+              </div>
+            </div>
+
+            <div class="bg-base-300 p-4 rounded-lg">
+              <h3 class="font-semibold mb-2">Team Setup:</h3>
+              <ul class="list-disc list-inside space-y-1 text-sm">
+                <li>White Team: Player 1 (Board A) + Player 3 (Board B)</li>
+                <li>Black Team: Player 2 (Board A) + Player 4 (Board B)</li>
+              </ul>
+            </div>
+          </div>
+
+          <.form for={%{}} action={~p"/game"} method="post">
+            <div class="card-actions justify-end">
+              <button type="submit" class="btn btn-primary btn-lg">
+                Create Game
+              </button>
+            </div>
+          </.form>
+        </div>
+      </div>
+
+      <div class="mt-8">
+        <h2 class="text-2xl font-bold mb-4">How to Play Bughouse</h2>
+        <div class="space-y-4">
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title text-lg font-medium">Basic Rules</div>
+            <div class="collapse-content">
+              <p>
+                Bughouse is played with four players in two teams of two. Each team has one player
+                on Board A and one on Board B. When you capture a piece, it becomes available for
+                your teammate to place on their board.
+              </p>
+            </div>
+          </div>
+
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title text-lg font-medium">Piece Transfers</div>
+            <div class="collapse-content">
+              <p>
+                Captured pieces can be placed (dropped) on any empty square on your teammate's board,
+                except pawns cannot be placed on the 1st or 8th rank.
+              </p>
+            </div>
+          </div>
+
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title text-lg font-medium">Winning Conditions</div>
+            <div class="collapse-content">
+              <p>
+                A team wins if either player on the opposing team is checkmated or runs out of time.
+                Both boards are in play simultaneously, creating dynamic and fast-paced gameplay.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

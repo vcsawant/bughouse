@@ -17,7 +17,10 @@ defmodule BughouseWeb.Router do
   scope "/", BughouseWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    get "/", PageController, :landing
+    get "/game/new", PageController, :new_game
+    post "/game", PageController, :create_game
+    live "/lobby/:invite_code", LobbyLive
   end
 
   # Other scopes may use custom stacks.
