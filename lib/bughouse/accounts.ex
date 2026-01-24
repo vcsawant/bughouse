@@ -41,12 +41,13 @@ defmodule Bughouse.Accounts do
       total_games: player.total_games + 1
     }
 
-    attrs = case outcome do
-      :win -> Map.put(attrs, :wins, player.wins + 1)
-      :loss -> Map.put(attrs, :losses, player.losses + 1)
-      :draw -> Map.put(attrs, :draws, player.draws + 1)
-      _ -> attrs
-    end
+    attrs =
+      case outcome do
+        :win -> Map.put(attrs, :wins, player.wins + 1)
+        :loss -> Map.put(attrs, :losses, player.losses + 1)
+        :draw -> Map.put(attrs, :draws, player.draws + 1)
+        _ -> attrs
+      end
 
     player
     |> Player.changeset(attrs)

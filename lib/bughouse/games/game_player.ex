@@ -25,13 +25,25 @@ defmodule Bughouse.Games.GamePlayer do
   def changeset(game_player, attrs) do
     game_player
     |> cast(attrs, [
-      :game_id, :player_id, :position, :color, :board,
-      :rating_before, :rating_after, :rating_change,
-      :won, :outcome
+      :game_id,
+      :player_id,
+      :position,
+      :color,
+      :board,
+      :rating_before,
+      :rating_after,
+      :rating_change,
+      :won,
+      :outcome
     ])
     |> validate_required([
-      :game_id, :player_id, :position, :color, :board,
-      :rating_before, :outcome
+      :game_id,
+      :player_id,
+      :position,
+      :color,
+      :board,
+      :rating_before,
+      :outcome
     ])
     |> validate_inclusion(:color, ["white", "black"])
     |> validate_inclusion(:board, [1, 2])

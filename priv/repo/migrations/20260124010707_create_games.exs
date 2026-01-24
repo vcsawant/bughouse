@@ -21,8 +21,10 @@ defmodule Bughouse.Repo.Migrations.CreateGames do
       add :moves, :jsonb, default: "[]"
 
       # Game result
-      add :result, :string  # "timeout", "king_captured", "draw", "incomplete"
-      add :result_details, :jsonb  # Who timed out, which king captured, etc.
+      # "timeout", "king_captured", "draw", "incomplete"
+      add :result, :string
+      # Who timed out, which king captured, etc.
+      add :result_details, :jsonb
       add :result_timestamp, :utc_datetime_usec
 
       # Final board states (for analytics/visualization)

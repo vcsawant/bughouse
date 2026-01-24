@@ -27,8 +27,15 @@ defmodule Bughouse.Accounts.Player do
   def changeset(player, attrs) do
     player
     |> cast(attrs, [
-      :display_name, :current_rating, :peak_rating,
-      :total_games, :wins, :losses, :draws, :guest, :email
+      :display_name,
+      :current_rating,
+      :peak_rating,
+      :total_games,
+      :wins,
+      :losses,
+      :draws,
+      :guest,
+      :email
     ])
     |> validate_required([:display_name])
     |> unique_constraint(:display_name)

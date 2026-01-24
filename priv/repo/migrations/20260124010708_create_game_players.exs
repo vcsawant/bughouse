@@ -8,9 +8,12 @@ defmodule Bughouse.Repo.Migrations.CreateGamePlayers do
       add :player_id, references(:players, type: :uuid, on_delete: :delete_all), null: false
 
       # Position in game
-      add :position, :string, null: false  # "board_1_white", "board_1_black", etc.
-      add :color, :string, null: false     # "white" or "black"
-      add :board, :integer, null: false    # 1 or 2
+      # "board_1_white", "board_1_black", etc.
+      add :position, :string, null: false
+      # "white" or "black"
+      add :color, :string, null: false
+      # 1 or 2
+      add :board, :integer, null: false
 
       # Ratings at time of game
       add :rating_before, :integer, null: false
@@ -19,7 +22,8 @@ defmodule Bughouse.Repo.Migrations.CreateGamePlayers do
 
       # Outcome for this player
       add :won, :boolean
-      add :outcome, :string  # "win", "loss", "draw", "incomplete"
+      # "win", "loss", "draw", "incomplete"
+      add :outcome, :string
 
       timestamps(inserted_at: :created_at, updated_at: false, type: :utc_datetime)
     end

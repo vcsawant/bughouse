@@ -35,11 +35,21 @@ defmodule Bughouse.Games.Game do
   def changeset(game, attrs) do
     game
     |> cast(attrs, [
-      :invite_code, :status, :time_control,
-      :board_1_white_id, :board_1_black_id, :board_2_white_id, :board_2_black_id,
-      :moves, :result, :result_details, :result_timestamp,
-      :final_board_1_fen, :final_board_2_fen,
-      :final_white_reserves, :final_black_reserves
+      :invite_code,
+      :status,
+      :time_control,
+      :board_1_white_id,
+      :board_1_black_id,
+      :board_2_white_id,
+      :board_2_black_id,
+      :moves,
+      :result,
+      :result_details,
+      :result_timestamp,
+      :final_board_1_fen,
+      :final_board_2_fen,
+      :final_white_reserves,
+      :final_black_reserves
     ])
     |> validate_required([:invite_code, :status, :time_control])
     |> validate_inclusion(:status, [:waiting, :in_progress, :completed])
