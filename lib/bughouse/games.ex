@@ -8,6 +8,8 @@ defmodule Bughouse.Games do
   alias Bughouse.Games.{Game, GamePlayer}
   alias Bughouse.Accounts
 
+  @topic_prefix "game:"
+
   @doc """
   Creates a new game with unique invite code.
   """
@@ -34,6 +36,15 @@ defmodule Bughouse.Games do
   """
   def get_game_by_invite_code(code), do: Repo.get_by(Game, invite_code: code)
   def get_game_by_invite_code!(code), do: Repo.get_by!(Game, invite_code: code)
+
+  @doc """
+  Subscribes the current process to real-time updates for a game.
+
+  Subscribe in LiveView mount to receive broadcasts when players join/leave or game starts.
+  """
+  def subscribe_to_game(invite_code) do
+    Phoenix.PubSub.subscribe(Bughouse.PubSub, @topic_prefix <> invite_code)
+  end
 
   @doc """
   Completes a game and updates all player stats.
@@ -181,8 +192,12 @@ defmodule Bughouse.Games do
       end
     end)
     |> case do
-      {:ok, game} -> {:ok, game}
-      {:error, reason} -> {:error, reason}
+      {:ok, game} ->
+        broadcast_game_update(game, :player_joined)
+        {:ok, game}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -210,8 +225,12 @@ defmodule Bughouse.Games do
 
           position ->
             case join_game(game_id, player_id, position) do
-              {:ok, updated_game} -> {:ok, {updated_game, position}}
-              error -> error
+              {:ok, updated_game} ->
+                # broadcast_game_update already called by join_game/3
+                {:ok, {updated_game, position}}
+
+              error ->
+                error
             end
         end
     end
@@ -252,9 +271,95 @@ defmodule Bughouse.Games do
       end
     end)
     |> case do
-      {:ok, game} -> {:ok, game}
-      {:error, reason} -> {:error, reason}
+      {:ok, game} ->
+        broadcast_game_update(game, :game_started)
+        {:ok, game}
+
+      {:error, reason} ->
+        {:error, reason}
     end
+  end
+
+  @doc """
+  Removes a player from a game.
+
+  Only works if the game is still in :waiting status.
+
+  Returns `{:ok, updated_game}` or `{:error, reason}`.
+
+  Error reasons:
+  - `:game_not_found` - Game doesn't exist
+  - `:cannot_leave` - Game has already started
+  """
+  def leave_game(game_id, player_id) do
+    Repo.transaction(fn ->
+      game =
+        from(g in Game, where: g.id == ^game_id, lock: "FOR UPDATE")
+        |> Repo.one()
+
+      cond do
+        is_nil(game) ->
+          Repo.rollback(:game_not_found)
+
+        game.status != :waiting ->
+          Repo.rollback(:cannot_leave)
+
+        true ->
+          # Find and clear the player's position
+          position_field =
+            [:board_1_white_id, :board_1_black_id, :board_2_white_id, :board_2_black_id]
+            |> Enum.find(fn field ->
+              Map.get(game, field) == player_id
+            end)
+
+          if position_field do
+            game
+            |> Game.changeset(%{position_field => nil})
+            |> Repo.update!()
+          else
+            # Player wasn't in the game, just return game unchanged
+            game
+          end
+      end
+    end)
+    |> case do
+      {:ok, game} ->
+        broadcast_game_update(game, :player_left)
+        {:ok, game}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Gets a game with player names loaded.
+
+  Returns a tuple of `{game, players_map}` where `players_map` is a map
+  of player_id => display_name for all players in the game.
+  """
+  def get_game_with_players(invite_code) do
+    game = get_game_by_invite_code!(invite_code)
+
+    player_ids =
+      [
+        game.board_1_white_id,
+        game.board_1_black_id,
+        game.board_2_white_id,
+        game.board_2_black_id
+      ]
+      |> Enum.filter(&(&1 != nil))
+
+    players =
+      if Enum.empty?(player_ids) do
+        %{}
+      else
+        from(p in Bughouse.Accounts.Player, where: p.id in ^player_ids)
+        |> Repo.all()
+        |> Map.new(&{&1.id, &1.display_name})
+      end
+
+    {game, players}
   end
 
   defp validate_join(game, player_id, position) do
@@ -297,9 +402,12 @@ defmodule Bughouse.Games do
       not is_nil(game.board_2_black_id)
   end
 
-  defp count_players(%Game{} = game) do
-    [game.board_1_white_id, game.board_1_black_id, game.board_2_white_id, game.board_2_black_id]
-    |> Enum.count(&(&1 != nil))
+  defp broadcast_game_update(game, event_type) do
+    Phoenix.PubSub.broadcast(
+      Bughouse.PubSub,
+      @topic_prefix <> game.invite_code,
+      {event_type, game}
+    )
   end
 
   defp generate_invite_code do
