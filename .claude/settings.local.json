@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh issue view:*)",
+      "Bash(mkdir:*)",
+      "Bash(mix compile:*)",
+      "Bash(mix test)",
+      "Bash(mix format:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: implement basic page structure with landing and lobby pages\n\n- Create LandingLive module for landing page at `/`\n- Create LobbyLive module for game creation at `/lobby/new`\n- Update router to use LiveView instead of PageController\n- Add navigation links between pages\n- Update test to match new landing page content\n\nAll acceptance criteria met:\n✓ Landing page at `/` created\n✓ Create game page at `/lobby/new` created\n✓ Basic navigation between pages works\n✓ Routes defined in router.ex\n✓ Templates created (using Tailwind for basic styling)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(echo:*)",
+      "mcp__plugin_github_github__issue_read",
+      "WebSearch",
+      "WebFetch(domain:hexdocs.pm)",
+      "WebFetch(domain:github.com)",
+      "Bash(ls:*)",
+      "Bash(git mv:*)",
+      "Bash(find:*)",
+      "Bash(make test:*)",
+      "Bash(brew install:*)",
+      "Bash(mix deps.get:*)",
+      "Bash(mix ecto.gen.migration:*)",
+      "Bash(mix ecto.create:*)",
+      "Bash(mix ecto.migrate:*)",
+      "Bash(psql:*)",
+      "Bash(mix test:*)",
+      "Bash(iex -S mix phx.server:*)"
+    ]
+  },
+  "outputStyle": "Explanatory"
+}

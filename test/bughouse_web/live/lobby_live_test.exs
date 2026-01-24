@@ -269,14 +269,17 @@ defmodule BughouseWeb.LobbyLiveTest do
   end
 
   describe "player slots display" do
-    test "shows all 4 position labels", %{conn: conn} do
+    test "shows both boards and player positions", %{conn: conn} do
       {:ok, game} = Games.create_game()
       {:ok, _view, html} = live(conn, ~p"/lobby/#{game.invite_code}")
 
-      assert html =~ "Board A - White"
-      assert html =~ "Board A - Black"
-      assert html =~ "Board B - White"
-      assert html =~ "Board B - Black"
+      assert html =~ "Board A"
+      assert html =~ "Board B"
+      assert html =~ "White"
+      assert html =~ "Black"
+      assert html =~ "Team 1"
+      assert html =~ "Team 2"
+      assert html =~ "Open Seat"
     end
 
     test "displays player names in filled positions", %{conn: conn} do

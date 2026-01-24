@@ -43,8 +43,9 @@ defmodule BughouseWeb.PageControllerTest do
       conn = get(conn, ~p"/game/new")
       response = html_response(conn, 200)
       assert response =~ "Team Setup"
-      assert response =~ "White Team"
-      assert response =~ "Black Team"
+      assert response =~ "Team 1"
+      assert response =~ "Team 2"
+      assert response =~ "Partners sit next to each other"
     end
 
     test "GET /game/new includes create game button", %{conn: conn} do

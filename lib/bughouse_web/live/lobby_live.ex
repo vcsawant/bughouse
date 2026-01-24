@@ -134,11 +134,6 @@ defmodule BughouseWeb.LobbyLive do
     end
   end
 
-  defp position_label(:board_1_white), do: "Board A - White"
-  defp position_label(:board_1_black), do: "Board A - Black"
-  defp position_label(:board_2_white), do: "Board B - White"
-  defp position_label(:board_2_black), do: "Board B - Black"
-
   defp position_occupied?(game, position) do
     Map.get(game, :"#{position}_id") != nil
   end
@@ -165,7 +160,7 @@ defmodule BughouseWeb.LobbyLive do
           <a href={~p"/"} class="btn btn-ghost">← Back to Home</a>
         </div>
 
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-6xl mx-auto">
           <h1 class="text-4xl font-bold mb-8 text-center">Game Lobby</h1>
           <!-- Invite Code Card -->
           <div class="card bg-base-200 mb-6">
@@ -195,51 +190,98 @@ defmodule BughouseWeb.LobbyLive do
               </div>
             </div>
           </div>
-          <!-- Player Slots Card -->
+          <!-- Bughouse Table Layout -->
           <div class="card bg-base-200 mb-6">
             <div class="card-body">
-              <h2 class="card-title">Players</h2>
-              <!-- Quick Join Button -->
-              <button
-                :if={@my_position == nil and @game.status == :waiting}
-                class="btn btn-success btn-lg mb-4"
-                phx-click="quick_join"
-              >
-                Quick Join
-              </button>
-              <!-- 4 Player Slots -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <.player_slot
-                  position={:board_1_white}
-                  label={position_label(:board_1_white)}
-                  game={@game}
-                  players={@players}
-                  my_position={@my_position}
-                />
-                <.player_slot
-                  position={:board_1_black}
-                  label={position_label(:board_1_black)}
-                  game={@game}
-                  players={@players}
-                  my_position={@my_position}
-                />
-                <.player_slot
-                  position={:board_2_white}
-                  label={position_label(:board_2_white)}
-                  game={@game}
-                  players={@players}
-                  my_position={@my_position}
-                />
-                <.player_slot
-                  position={:board_2_black}
-                  label={position_label(:board_2_black)}
-                  game={@game}
-                  players={@players}
-                  my_position={@my_position}
-                />
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="card-title">Bughouse Table</h2>
+                <button
+                  :if={@my_position == nil and @game.status == :waiting}
+                  class="btn btn-success"
+                  phx-click="quick_join"
+                >
+                  Quick Join
+                </button>
               </div>
-              <!-- Leave / Start Buttons -->
-              <div class="card-actions justify-end mt-6">
+              <!-- Team 2 (Top Side) -->
+              <div class="mb-3">
+                <div class="text-xs font-semibold text-center mb-2 opacity-50">Team 2</div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <.player_seat
+                    position={:board_1_black}
+                    color="Black"
+                    board="A"
+                    game={@game}
+                    players={@players}
+                    my_position={@my_position}
+                  />
+                  <.player_seat
+                    position={:board_2_white}
+                    color="White"
+                    board="B"
+                    game={@game}
+                    players={@players}
+                    my_position={@my_position}
+                  />
+                </div>
+              </div>
+              <!-- Two Boards Side by Side -->
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 my-6">
+                <!-- Board A (White bottom) -->
+                <div class="flex flex-col items-center">
+                  <div class="text-sm font-semibold mb-2 opacity-70">Board A</div>
+                  <.chess_board color_bottom="white" />
+                </div>
+                <!-- Board B (Black bottom) -->
+                <div class="flex flex-col items-center">
+                  <div class="text-sm font-semibold mb-2 opacity-70">Board B</div>
+                  <.chess_board color_bottom="black" />
+                </div>
+              </div>
+              <!-- Team 1 (Bottom Side) -->
+              <div class="mb-4">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <.player_seat
+                    position={:board_1_white}
+                    color="White"
+                    board="A"
+                    game={@game}
+                    players={@players}
+                    my_position={@my_position}
+                  />
+                  <.player_seat
+                    position={:board_2_black}
+                    color="Black"
+                    board="B"
+                    game={@game}
+                    players={@players}
+                    my_position={@my_position}
+                  />
+                </div>
+                <div class="text-xs font-semibold text-center mt-2 opacity-50">Team 1</div>
+              </div>
+              <!-- Team Info -->
+              <div class="alert alert-info mb-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  class="stroke-current shrink-0 w-6 h-6"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div class="text-sm">
+                  <strong>Teams:</strong>
+                  Team 1 (White/A + Black/B) vs Team 2 (Black/A + White/B) · Partners sit next to each other
+                </div>
+              </div>
+              <!-- Action Buttons -->
+              <div class="card-actions justify-end">
                 <button
                   :if={@my_position != nil}
                   class="btn btn-ghost"
@@ -264,36 +306,56 @@ defmodule BughouseWeb.LobbyLive do
     """
   end
 
-  # Player Slot Component
-  defp player_slot(assigns) do
+  # Chess Board Component (simplified visual representation)
+  defp chess_board(assigns) do
     ~H"""
-    <div class="bg-base-300 p-4 rounded-lg">
-      <div class="flex items-center justify-between">
-        <div class="flex-1">
-          <div class="font-semibold text-sm text-base-content/70">{@label}</div>
-          <div class="text-lg font-bold mt-1">
+    <div class="my-3">
+      <div class="grid grid-cols-8 gap-0 w-64 h-64 border-4 border-base-content/20 shadow-lg">
+        <%= for row <- 0..7 do %>
+          <%= for col <- 0..7 do %>
+            <% is_light = rem(row + col, 2) == 0 %>
+            <% square_color = if is_light, do: "bg-amber-100", else: "bg-amber-800" %>
+            <div class={"#{square_color} aspect-square"}></div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  # Player Seat Component (positioned around table)
+  defp player_seat(assigns) do
+    ~H"""
+    <div class="w-full">
+      <div class="bg-base-300 rounded-lg p-3 border-2 border-base-content/10">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-semibold opacity-60 mb-1">
+              {@color} · Board {@board}
+            </div>
             <%= if position_occupied?(@game, @position) do %>
-              <span class="flex items-center gap-2">
+              <div class="flex items-center gap-2">
                 <%= if @position == @my_position do %>
                   <span class="badge badge-primary badge-sm">You</span>
                 <% end %>
-                {get_player_name(@players, Map.get(@game, :"#{@position}_id"))}
-              </span>
+                <span class="font-bold truncate">
+                  {get_player_name(@players, Map.get(@game, :"#{@position}_id"))}
+                </span>
+              </div>
             <% else %>
-              <span class="text-base-content/50">Open</span>
+              <span class="text-base-content/50 text-sm">Open Seat</span>
             <% end %>
           </div>
+          <%= if !position_occupied?(@game, @position) and @my_position == nil and @game.status == :waiting do %>
+            <button
+              class="btn btn-sm btn-primary"
+              phx-click="join_position"
+              phx-value-position={@position}
+            >
+              Sit Here
+            </button>
+          <% end %>
         </div>
-
-        <%= if !position_occupied?(@game, @position) and @my_position == nil and @game.status == :waiting do %>
-          <button
-            class="btn btn-sm btn-primary"
-            phx-click="join_position"
-            phx-value-position={@position}
-          >
-            Join
-          </button>
-        <% end %>
       </div>
     </div>
     """
