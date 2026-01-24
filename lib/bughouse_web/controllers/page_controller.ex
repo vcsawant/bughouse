@@ -10,16 +10,16 @@ defmodule BughouseWeb.PageController do
   end
 
   def create_game(conn, _params) do
-    # Generate invite code (same logic as LobbyLive)
-    invite_code = generate_invite_code()
+    alias Bughouse.Games
 
-    # Redirect to lobby waiting room
-    redirect(conn, to: ~p"/lobby/#{invite_code}")
-  end
+    case Games.create_game() do
+      {:ok, game} ->
+        redirect(conn, to: ~p"/lobby/#{game.invite_code}")
 
-  # Helper function to generate a random invite code
-  defp generate_invite_code do
-    :crypto.strong_rand_bytes(4)
-    |> Base.encode16(case: :upper)
+      {:error, _changeset} ->
+        conn
+        |> put_flash(:error, "Failed to create game. Please try again.")
+        |> redirect(to: ~p"/game/new")
+    end
   end
 end

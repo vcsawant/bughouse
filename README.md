@@ -37,10 +37,12 @@ This creates a unique dynamic where players must balance their own game while co
 **Status:** In Development
 
 - [x] **Guest Play**
-  - Create games without an account
-  - Share invite links with 3 other players
-  - Join games via unique invite codes
-  - Play full Bughouse games anonymously
+  - [x] Create games without an account
+  - [x] Share invite links with 3 other players
+  - [x] Join games via unique invite codes
+  - [x] Join specific positions (board_1_white, board_1_black, etc.)
+  - [x] Join random available positions
+  - [ ] Play full Bughouse games anonymously (awaiting LiveView UI)
 
 - [ ] **Real-Time Gameplay**
   - Two simultaneous chess boards rendered side-by-side
@@ -720,7 +722,7 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ## 🗺️ Roadmap
 
-### Q1 2025 (Current)
+### Q1 2026 (Current)
 - [x] Project setup and architecture
 - [x] Database schema (players, games, game_players, friendships)
 - [x] binbo-bughouse fork integration
@@ -728,18 +730,18 @@ This project is licensed under the MIT License - see LICENSE file for details.
 - [ ] Bughouse mechanics
 - [ ] Real-time gameplay (guest play)
 
-### Q2 2025
+### Q2 2026
 - [ ] User authentication
 - [ ] Game history tracking
 - [ ] Friend system
 - [ ] Production deployment
 
-### Q3 2025
+### Q3 2026
 - [ ] Game replay feature
 - [ ] Statistics and rankings
 - [ ] Tournament system
 
-### Q4 2025 / 2026
+### Q4 2026 / 2027
 - [ ] AI opponent (Rust integration)
 - [ ] Advanced features (voice chat, etc.)
 
@@ -747,9 +749,9 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ## 📧 Contact
 
-**Project Maintainer:** [Your Name]
-**Email:** [Your Email]
-**GitHub:** [Your GitHub Profile]
+**Project Maintainer:** Viren Sawant
+**Email:** viren.c.sawant@gmail.com
+**GitHub:** https://github.com/vcsawant
 
 ---
 
@@ -771,4 +773,4 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ---
 
-**Last Updated:** December 2024
+**Last Updated:** January 2026
