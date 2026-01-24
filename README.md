@@ -196,73 +196,114 @@ This creates a unique dynamic where players must balance their own game while co
 
 ## 📊 Data Models
 
+### Database Architecture Strategy
+
+**Write-Once at Game Completion:**
+- Game state managed in-memory during active gameplay (LiveView/GenServer)
+- Chess logic handled by binbo-bughouse fork
+- **Single database transaction at game end** writes:
+  - Final game state (boards, moves, result)
+  - Player rating updates
+  - game_players records for stats
+
+**Benefits:**
+- Zero database bottleneck during gameplay
+- Full replay capability via JSONB moves array
+- Efficient stats queries via game_players join table
+- Simple, fast implementation
+
 ### Core Schemas
+
+**Player:**
+```elixir
+- id (uuid)
+- display_name (string, unique)
+- current_rating (integer, default: 1200)
+- peak_rating (integer, default: 1200)
+- total_games (integer, default: 0)
+- wins, losses, draws (integer, default: 0)
+- guest (boolean, default: true)
+- email (string, nullable)
+- inserted_at, updated_at (timestamps)
+```
 
 **Game:**
 ```elixir
 - id (uuid)
 - invite_code (string, unique, 8 chars)
 - status (enum: waiting, in_progress, completed)
-- board_state_a (jsonb) - Board A game state
-- board_state_b (jsonb) - Board B game state
-- white_team_captures (jsonb) - Pieces captured by white team
-- black_team_captures (jsonb) - Pieces captured by black team
-- player_1_id (references users, nullable)
-- player_2_id (references users, nullable)
-- player_3_id (references users, nullable)
-- player_4_id (references users, nullable)
-- player_1_time_ms (integer) - Remaining time in milliseconds
-- player_2_time_ms (integer)
-- player_3_time_ms (integer)
-- player_4_time_ms (integer)
-- result (string) - "white_team_win", "black_team_win", etc.
-- winning_reason (string) - "checkmate", "timeout", "resignation"
+- board_1_white_id (uuid, references players)
+- board_1_black_id (uuid, references players)
+- board_2_white_id (uuid, references players)
+- board_2_black_id (uuid, references players)
+- time_control (string) - e.g., "10min", "3+2"
+- moves (jsonb array) - Complete move history
+- result (string) - "king_captured", "timeout", "draw"
+- result_details (jsonb) - Structured result information
+- result_timestamp (utc_datetime_usec)
+- final_board_1_fen (text) - Final position for analytics
+- final_board_2_fen (text)
+- final_white_reserves (array of strings)
+- final_black_reserves (array of strings)
 - inserted_at, updated_at (timestamps)
 ```
 
-**User:**
+**GamePlayer (Join Table - The "Magic Table" for Stats):**
 ```elixir
 - id (uuid)
-- username (string, unique)
-- email (string, unique)
-- hashed_password (string)
-- confirmed_at (datetime, nullable)
-- inserted_at, updated_at (timestamps)
+- game_id (uuid, references games)
+- player_id (uuid, references players)
+- position (string) - "board_1_white", "board_1_black", etc.
+- color (string) - "white" or "black"
+- board (integer) - 1 or 2
+- rating_before (integer)
+- rating_after (integer)
+- rating_change (integer)
+- won (boolean)
+- outcome (enum: win, loss, draw, incomplete)
+- created_at (timestamp)
 ```
 
 **Friendship:**
 ```elixir
 - id (uuid)
-- user_id (references users)
-- friend_id (references users)
-- status (enum: pending, accepted, rejected)
+- player_id (uuid, references players)
+- friend_id (uuid, references players)
+- status (enum: pending, accepted, blocked)
 - inserted_at, updated_at (timestamps)
 ```
 
-### Board State Structure
+### Move Structure (JSONB)
 
-Each board state is stored as JSONB with this structure:
+Each move in the `games.moves` array:
 
 ```json
 {
-  "squares": {
-    "a1": {"type": "rook", "color": "white"},
-    "a2": {"type": "pawn", "color": "white"},
-    "e1": {"type": "king", "color": "white"},
-    ...
-  },
-  "active_color": "white",
-  "castling_rights": {
-    "white_kingside": true,
-    "white_queenside": true,
-    "black_kingside": true,
-    "black_queenside": true
-  },
-  "en_passant_target": null,
-  "halfmove_clock": 0,
-  "fullmove_number": 1
+  "player": 1,           // Player enum (1-4)
+  "move_time": 2.5,      // Seconds into game (game clock)
+  "notation": "e2e4",    // UCI notation
+  "board": 1,            // Board number (1 or 2)
+  "captured": "p"        // Optional: captured piece
 }
 ```
+
+**Player Enum Convention:**
+- 1 = board_1_white
+- 2 = board_1_black
+- 3 = board_2_white
+- 4 = board_2_black
+
+### Analytics Queries Enabled
+
+The game_players join table enables efficient queries for:
+- ✅ Win/loss overall record
+- ✅ Stats with specific friends
+- ✅ Winrate by color (white/black)
+- ✅ Rating history over time
+- ✅ Winrate by time control
+- ✅ Average move time (via JSONB query on moves)
+- ✅ Performance trends
+- ✅ Most common openings
 
 ---
 
@@ -681,6 +722,8 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ### Q1 2025 (Current)
 - [x] Project setup and architecture
+- [x] Database schema (players, games, game_players, friendships)
+- [x] binbo-bughouse fork integration
 - [ ] Core chess engine implementation
 - [ ] Bughouse mechanics
 - [ ] Real-time gameplay (guest play)
