@@ -79,8 +79,10 @@ defmodule BughouseWeb do
     quote do
       # HTML escaping functionality
       import Phoenix.HTML
-      # Core UI components
+      # Core UI components (buttons, inputs, forms, etc.)
       import BughouseWeb.CoreComponents
+      # Chess-specific components (boards, pieces, etc.)
+      import BughouseWeb.ChessComponents
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

@@ -102,4 +102,121 @@
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
+/* Chess Board Theming System
+   These CSS custom properties define chess board color schemes.
+   Independent from light/dark mode - users can choose board theme separately.
+*/
+
+/* Default theme: Classic Brown/Cream (like chess.com) */
+:root {
+  --chess-light-square: oklch(85% 0.05 72);  /* Cream */
+  --chess-dark-square: oklch(55% 0.06 62);   /* Brown */
+  --chess-board-border: oklch(40% 0.06 62);  /* Dark brown */
+  --chess-highlight: oklch(75% 0.15 120);    /* Soft green */
+  --chess-selected: oklch(70% 0.20 240);     /* Soft blue */
+}
+
+/* Green theme: Tournament Green/White */
+[data-chess-theme="green"] {
+  --chess-light-square: oklch(95% 0.02 120); /* Off-white */
+  --chess-dark-square: oklch(60% 0.15 145);  /* Forest green */
+  --chess-board-border: oklch(40% 0.15 145);
+  --chess-highlight: oklch(75% 0.20 120);
+  --chess-selected: oklch(70% 0.25 240);
+}
+
+/* Blue theme: Ocean Blue/White */
+[data-chess-theme="blue"] {
+  --chess-light-square: oklch(93% 0.02 240); /* Ice blue */
+  --chess-dark-square: oklch(50% 0.15 240);  /* Ocean blue */
+  --chess-board-border: oklch(35% 0.15 240);
+  --chess-highlight: oklch(75% 0.20 180);
+  --chess-selected: oklch(70% 0.25 60);
+}
+
+/* Gray theme: Modern Monochrome */
+[data-chess-theme="gray"] {
+  --chess-light-square: oklch(90% 0 0);      /* Light gray */
+  --chess-dark-square: oklch(50% 0 0);       /* Dark gray */
+  --chess-board-border: oklch(30% 0 0);
+  --chess-highlight: oklch(75% 0.10 120);
+  --chess-selected: oklch(70% 0.15 240);
+}
+
+/* Purple theme: Royal Purple/White */
+[data-chess-theme="purple"] {
+  --chess-light-square: oklch(92% 0.03 300); /* Lavender */
+  --chess-dark-square: oklch(45% 0.15 300);  /* Royal purple */
+  --chess-board-border: oklch(30% 0.15 300);
+  --chess-highlight: oklch(75% 0.20 120);
+  --chess-selected: oklch(70% 0.25 60);
+}
+
+/* Chess Piece Styling
+   Unicode chess pieces need special styling to render consistently.
+   We use a dedicated font (Noto Sans Symbols 2) to ensure all pieces
+   render uniformly across all browsers and systems.
+*/
+.chess-piece {
+  /* Use dedicated chess font for consistent rendering */
+  font-family: 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Color Emoji', sans-serif;
+
+  /* Prevent text selection */
+  user-select: none;
+  -webkit-user-select: none;
+
+  /* Ensure crisp rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Center pieces in squares */
+  display: inline-block;
+  line-height: 0.9;
+
+  /* Vertical centering - compensate for font's descender space */
+  vertical-align: middle;
+  position: relative;
+  top: 0.08em;
+
+  /* Improve rendering quality */
+  text-rendering: optimizeLegibility;
+}
+
+/* White pieces - use filled style with white fill and black stroke */
+.chess-piece-white {
+  color: white;
+  /* Add subtle shadow for depth on dark squares */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  /* Stroke effect for better visibility */
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;
+}
+
+/* Black pieces - make them actually black/dark gray */
+.chess-piece-black {
+  /* Use dark gray instead of pure black for better visibility */
+  color: oklch(25% 0 0);
+  /* Lighter shadow for black pieces */
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+
+/* Adapt piece colors based on app theme */
+[data-theme="dark"] .chess-piece-white {
+  /* In dark mode, white pieces have less contrast */
+  color: oklch(95% 0 0);
+  text-shadow:
+    -1px -1px 0 #222,
+    1px -1px 0 #222,
+    -1px 1px 0 #222,
+    1px 1px 0 #222;
+}
+
+[data-theme="dark"] .chess-piece-black {
+  /* In dark mode, make black pieces slightly lighter */
+  color: oklch(30% 0 0);
+}
+
 /* This file is for your main application CSS */

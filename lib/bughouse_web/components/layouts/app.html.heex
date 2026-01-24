@@ -1,0 +1,31 @@
+<div class="min-h-screen bg-base-100">
+  <!-- Navigation Bar -->
+  <nav class="navbar bg-base-200 border-b border-base-300 px-4 sm:px-6 lg:px-8">
+    <div class="flex-1">
+      <a href={~p"/"} class="btn btn-ghost text-xl font-bold">
+        ♟️ Bughouse Chess
+      </a>
+    </div>
+
+    <div class="flex-none">
+      <ul class="menu menu-horizontal px-1 gap-2">
+        <li>
+          <a href={~p"/game/new"} class="btn btn-ghost btn-sm">
+            New Game
+          </a>
+        </li>
+        <li>
+          <.theme_toggle />
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main>
+    {@inner_content}
+  </main>
+
+  <!-- Flash Messages -->
+  <.flash_group flash={@flash} />
+</div>

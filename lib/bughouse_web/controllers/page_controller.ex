@@ -1,6 +1,8 @@
 defmodule BughouseWeb.PageController do
   use BughouseWeb, :controller
 
+  plug :put_layout, html: {BughouseWeb.Layouts, :app}
+
   def landing(conn, _params) do
     render(conn, :landing)
   end

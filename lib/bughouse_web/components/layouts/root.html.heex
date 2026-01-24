@@ -7,11 +7,19 @@
     <.live_title default="Bughouse" suffix=" · Phoenix Framework">
       {assigns[:page_title]}
     </.live_title>
+    <!-- Chess font for consistent Unicode piece rendering -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2&display=swap"
+      rel="stylesheet"
+    />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
     <script>
       (() => {
+        // App theme (light/dark mode)
         const setTheme = (theme) => {
           if (theme === "system") {
             localStorage.removeItem("phx:theme");
@@ -25,8 +33,43 @@
           setTheme(localStorage.getItem("phx:theme") || "system");
         }
         window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
-        
         window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+
+        // Chess board theme (board colors - independent from app theme)
+        const setChessTheme = (theme) => {
+          localStorage.setItem("phx:chess-theme", theme);
+          // Apply theme to all chess boards on the page
+          document.querySelectorAll("[data-chess-board]").forEach(board => {
+            if (theme === "classic") {
+              board.removeAttribute("data-chess-theme");
+            } else {
+              board.setAttribute("data-chess-theme", theme);
+            }
+          });
+        };
+
+        // Restore saved chess theme on page load
+        const savedChessTheme = localStorage.getItem("phx:chess-theme") || "classic";
+        if (savedChessTheme !== "classic") {
+          // Wait for DOM to be ready
+          if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", () => setChessTheme(savedChessTheme));
+          } else {
+            setChessTheme(savedChessTheme);
+          }
+        }
+
+        // Listen for chess theme changes
+        window.addEventListener("phx:set-chess-theme", (e) => {
+          setChessTheme(e.target.dataset.phxChessTheme);
+        });
+
+        // Sync chess theme across browser tabs
+        window.addEventListener("storage", (e) => {
+          if (e.key === "phx:chess-theme") {
+            setChessTheme(e.newValue || "classic");
+          }
+        });
       })();
     </script>
   </head>

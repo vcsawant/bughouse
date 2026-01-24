@@ -25,11 +25,63 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/bughouse"
 import topbar from "../vendor/topbar"
 
+// Chess Clock Monitoring Hook
+// Detects when timer updates are stale (connection lag/disconnect)
+const ChessClockMonitor = {
+  mounted() {
+    this.checkInterval = setInterval(() => this.checkStaleness(), 1000)
+    this.lagWarning = this.el.querySelector('[data-lag-warning]')
+    this.activeIndicator = this.el.querySelector('[data-active-indicator]')
+  },
+
+  updated() {
+    // Reset staleness check when we receive an update
+    this.lastUpdateTime = Date.now()
+    if (this.lagWarning) {
+      this.lagWarning.classList.add('hidden')
+    }
+  },
+
+  checkStaleness() {
+    const lastUpdate = parseInt(this.el.dataset.lastUpdate) || Date.now()
+    const now = Date.now()
+    const staleness = now - lastUpdate
+
+    // Show warning if no update in 5 seconds
+    const STALE_THRESHOLD = 5000
+
+    if (staleness > STALE_THRESHOLD && this.lagWarning) {
+      this.lagWarning.classList.remove('hidden')
+
+      // Also dim the active indicator if present
+      if (this.activeIndicator) {
+        this.activeIndicator.style.opacity = '0.3'
+      }
+    } else {
+      if (this.lagWarning) {
+        this.lagWarning.classList.add('hidden')
+      }
+      if (this.activeIndicator) {
+        this.activeIndicator.style.opacity = '1'
+      }
+    }
+  },
+
+  destroyed() {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval)
+    }
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {
+    ...colocatedHooks,
+    ChessClockMonitor
+  },
 })
 
 // Show progress bar on live navigation and form submits

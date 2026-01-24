@@ -154,13 +154,8 @@ defmodule BughouseWeb.LobbyLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-base-100">
-      <div class="container mx-auto px-4 py-8">
-        <div class="mb-6">
-          <a href={~p"/"} class="btn btn-ghost">← Back to Home</a>
-        </div>
-
-        <div class="max-w-6xl mx-auto">
+    <div class="container mx-auto px-4 py-8">
+      <div class="max-w-6xl mx-auto">
           <h1 class="text-4xl font-bold mb-8 text-center">Game Lobby</h1>
           <!-- Invite Code Card -->
           <div class="card bg-base-200 mb-6">
@@ -230,12 +225,20 @@ defmodule BughouseWeb.LobbyLive do
                 <!-- Board A (White bottom) -->
                 <div class="flex flex-col items-center">
                   <div class="text-sm font-semibold mb-2 opacity-70">Board A</div>
-                  <.chess_board color_bottom="white" />
+                  <.chess_board
+                    fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+                    size="lg"
+                    flip={false}
+                  />
                 </div>
                 <!-- Board B (Black bottom) -->
                 <div class="flex flex-col items-center">
                   <div class="text-sm font-semibold mb-2 opacity-70">Board B</div>
-                  <.chess_board color_bottom="black" />
+                  <.chess_board
+                    fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+                    size="lg"
+                    flip={true}
+                  />
                 </div>
               </div>
               <!-- Team 1 (Bottom Side) -->
@@ -259,6 +262,10 @@ defmodule BughouseWeb.LobbyLive do
                   />
                 </div>
                 <div class="text-xs font-semibold text-center mt-2 opacity-50">Team 1</div>
+              </div>
+              <!-- Chess Board Theme Selector -->
+              <div class="bg-base-300 rounded-lg p-4 mb-4">
+                <.chess_board_theme_selector />
               </div>
               <!-- Team Info -->
               <div class="alert alert-info mb-4">
@@ -302,24 +309,6 @@ defmodule BughouseWeb.LobbyLive do
           </div>
         </div>
       </div>
-    </div>
-    """
-  end
-
-  # Chess Board Component (simplified visual representation)
-  defp chess_board(assigns) do
-    ~H"""
-    <div class="my-3">
-      <div class="grid grid-cols-8 gap-0 w-64 h-64 border-4 border-base-content/20 shadow-lg">
-        <%= for row <- 0..7 do %>
-          <%= for col <- 0..7 do %>
-            <% is_light = rem(row + col, 2) == 0 %>
-            <% square_color = if is_light, do: "bg-amber-100", else: "bg-amber-800" %>
-            <div class={"#{square_color} aspect-square"}></div>
-          <% end %>
-        <% end %>
-      </div>
-    </div>
     """
   end
 

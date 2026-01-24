@@ -21,7 +21,9 @@ defmodule BughouseWeb.Router do
     get "/game/new", PageController, :new_game
     post "/game", PageController, :create_game
 
-    live_session :game, on_mount: [{BughouseWeb.UserAuth, :ensure_guest_player}] do
+    live_session :game,
+      on_mount: [{BughouseWeb.UserAuth, :ensure_guest_player}],
+      layout: {BughouseWeb.Layouts, :app} do
       live "/lobby/:invite_code", LobbyLive
     end
   end
