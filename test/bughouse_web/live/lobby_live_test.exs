@@ -359,11 +359,13 @@ defmodule BughouseWeb.LobbyLiveTest do
       assert render(view) =~ "Leave Game"
     end
 
-    test "includes back to home link", %{conn: conn} do
+    test "includes navigation to home", %{conn: conn} do
       {:ok, game} = Games.create_game()
       {:ok, _view, html} = live(conn, ~p"/lobby/#{game.invite_code}")
 
-      assert html =~ "Back to Home"
+      # Navbar includes link to home page
+      assert html =~ "♟️ Bughouse Chess"
+      assert html =~ "href=\"/\""
     end
   end
 end
