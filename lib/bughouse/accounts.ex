@@ -5,7 +5,7 @@ defmodule Bughouse.Accounts do
 
   import Ecto.Query, warn: false
   alias Bughouse.Repo
-  alias Bughouse.Accounts.{Player, Friendship}
+  alias Bughouse.Schemas.Accounts.{Player, Friendship}
 
   @doc """
   Creates a guest player with auto-generated name.

@@ -5,7 +5,7 @@ defmodule Bughouse.Games do
 
   import Ecto.Query, warn: false
   alias Bughouse.Repo
-  alias Bughouse.Games.{Game, GamePlayer}
+  alias Bughouse.Schemas.Games.{Game, GamePlayer}
   alias Bughouse.Accounts
 
   @topic_prefix "game:"
@@ -30,6 +30,11 @@ defmodule Bughouse.Games do
     |> Game.changeset(attrs)
     |> Repo.insert()
   end
+
+  @doc """
+  Gets a game by ID.
+  """
+  def get_game!(id), do: Repo.get!(Game, id)
 
   @doc """
   Gets a game by invite code.
@@ -272,8 +277,17 @@ defmodule Bughouse.Games do
     end)
     |> case do
       {:ok, game} ->
-        broadcast_game_update(game, :game_started)
-        {:ok, game}
+        # Start the game server
+        case start_game_server(game.id) do
+          {:ok, pid} ->
+            broadcast_game_update(game, :game_started)
+            {:ok, game, pid}
+
+          {:error, reason} ->
+            require Logger
+            Logger.error("Failed to start game server: #{inspect(reason)}")
+            {:error, :server_start_failed}
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -354,7 +368,7 @@ defmodule Bughouse.Games do
       if Enum.empty?(player_ids) do
         %{}
       else
-        from(p in Bughouse.Accounts.Player, where: p.id in ^player_ids)
+        from(p in Bughouse.Schemas.Accounts.Player, where: p.id in ^player_ids)
         |> Repo.all()
         |> Map.new(&{&1.id, &1.display_name})
       end
@@ -408,6 +422,76 @@ defmodule Bughouse.Games do
       @topic_prefix <> game.invite_code,
       {event_type, game}
     )
+  end
+
+  @doc """
+  Starts a game server for an in-progress game.
+
+  Should be called after start_game/1 transitions status to :in_progress.
+  Returns {:ok, pid} or {:error, reason}.
+  """
+  def start_game_server(game_id) do
+    DynamicSupervisor.start_child(
+      Bughouse.Games.GameSupervisor,
+      {Bughouse.Games.BughouseGameServer, game_id}
+    )
+  end
+
+  @doc """
+  Gets the PID of a running game server.
+
+  Returns {:ok, pid} or {:error, :not_found}.
+  """
+  def get_game_server(game_id) do
+    case Registry.lookup(Bughouse.Games.Registry, game_id) do
+      [{pid, _}] -> {:ok, pid}
+      [] -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Makes a move on a running game.
+  """
+  def make_game_move(game_id, player_id, move_notation) do
+    with {:ok, pid} <- get_game_server(game_id) do
+      Bughouse.Games.BughouseGameServer.make_move(pid, player_id, move_notation)
+    end
+  end
+
+  @doc """
+  Drops a piece from reserves.
+  """
+  def drop_game_piece(game_id, player_id, piece_type, square) do
+    with {:ok, pid} <- get_game_server(game_id) do
+      Bughouse.Games.BughouseGameServer.drop_piece(pid, player_id, piece_type, square)
+    end
+  end
+
+  @doc """
+  Player resigns from game.
+  """
+  def resign_game(game_id, player_id) do
+    with {:ok, pid} <- get_game_server(game_id) do
+      Bughouse.Games.BughouseGameServer.resign(pid, player_id)
+    end
+  end
+
+  @doc """
+  Player offers a draw.
+  """
+  def offer_game_draw(game_id, player_id) do
+    with {:ok, pid} <- get_game_server(game_id) do
+      Bughouse.Games.BughouseGameServer.offer_draw(pid, player_id)
+    end
+  end
+
+  @doc """
+  Gets the current game state from the game server.
+  """
+  def get_game_state(game_id) do
+    with {:ok, pid} <- get_game_server(game_id) do
+      Bughouse.Games.BughouseGameServer.get_state(pid)
+    end
   end
 
   defp generate_invite_code do

@@ -1,4 +1,4 @@
-defmodule Bughouse.Accounts.Friendship do
+defmodule Bughouse.Schemas.Accounts.Friendship do
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -6,8 +6,8 @@ defmodule Bughouse.Accounts.Friendship do
   @foreign_key_type :binary_id
 
   schema "friendships" do
-    belongs_to :player, Bughouse.Accounts.Player
-    belongs_to :friend, Bughouse.Accounts.Player
+    belongs_to :player, Bughouse.Schemas.Accounts.Player
+    belongs_to :friend, Bughouse.Schemas.Accounts.Player
 
     field :status, Ecto.Enum, values: [:pending, :accepted, :blocked]
 

@@ -118,7 +118,7 @@ defmodule Bughouse.GamesTest do
       {:ok, game} = Games.join_game(game.id, p4.id, :board_2_black)
 
       # Start the game
-      {:ok, _game} = Games.start_game(game.id)
+      {:ok, _game, _pid} = Games.start_game(game.id)
 
       # Try to join after game started
       assert {:error, :game_already_started} = Games.join_game(game.id, player.id, :board_1_white)
@@ -224,9 +224,12 @@ defmodule Bughouse.GamesTest do
       assert game.status == :waiting
 
       # Start the game
-      {:ok, started_game} = Games.start_game(game.id)
+      {:ok, started_game, pid} = Games.start_game(game.id)
 
       assert started_game.status == :in_progress
+
+      # Clean up game server
+      Bughouse.Games.BughouseGameServer.stop(pid)
     end
 
     test "returns error when game not full", %{game: game} do
@@ -248,10 +251,13 @@ defmodule Bughouse.GamesTest do
       {:ok, game} = Games.join_game(game.id, p4.id, :board_2_black)
 
       # Start the game
-      {:ok, _started_game} = Games.start_game(game.id)
+      {:ok, _started_game, pid} = Games.start_game(game.id)
 
       # Try to start again
       assert {:error, :game_already_started} = Games.start_game(game.id)
+
+      # Clean up game server
+      Bughouse.Games.BughouseGameServer.stop(pid)
     end
 
     test "returns error when game not found" do

@@ -467,7 +467,6 @@ defmodule BughouseWeb.CoreComponents do
     )
   end
 
-
   @doc """
   Translates an error message using gettext.
   """

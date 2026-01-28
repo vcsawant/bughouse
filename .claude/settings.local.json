@@ -26,7 +26,17 @@
       "Bash(mix ecto.migrate:*)",
       "Bash(psql:*)",
       "Bash(mix test:*)",
-      "Bash(iex -S mix phx.server:*)"
+      "Bash(iex -S mix phx.server:*)",
+      "Bash(grep:*)",
+      "Bash(rebar3 compile:*)",
+      "Bash(erl:*)",
+      "Bash(erlc:*)",
+      "Bash(mix deps.update:*)",
+      "Bash(iex -S mix:*)",
+      "Bash(rebar3 clean:*)",
+      "Bash(mix deps.compile:*)",
+      "Bash(mix clean:*)",
+      "Bash(tree:*)"
     ]
   },
   "outputStyle": "Explanatory"

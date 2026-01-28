@@ -1,4 +1,4 @@
-defmodule Bughouse.Games.Game do
+defmodule Bughouse.Schemas.Games.Game do
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -26,7 +26,7 @@ defmodule Bughouse.Games.Game do
     field :final_white_reserves, {:array, :string}
     field :final_black_reserves, {:array, :string}
 
-    has_many :game_players, Bughouse.Games.GamePlayer
+    has_many :game_players, Bughouse.Schemas.Games.GamePlayer
 
     timestamps(type: :utc_datetime)
   end

@@ -119,25 +119,23 @@ defmodule BughouseWeb.ChessComponents do
       ]}>
         <%= for {rank, rank_idx} <- Enum.with_index(@board) do %>
           <%= for {piece, file_idx} <- Enum.with_index(rank) do %>
-            <%
-              # Calculate if square should be light or dark
-              # "Light on right" - bottom-right square is always light for both players
-              # Even sum of indices = light square
-              is_light = rem(rank_idx + file_idx, 2) == 0
+            <% # Calculate if square should be light or dark
+            # "Light on right" - bottom-right square is always light for both players
+            # Even sum of indices = light square
+            is_light = rem(rank_idx + file_idx, 2) == 0
 
-              square_color =
-                if is_light,
-                  do: "bg-[var(--chess-light-square,oklch(85%_0.05_72))]",
-                  else: "bg-[var(--chess-dark-square,oklch(55%_0.06_62))]"
+            square_color =
+              if is_light,
+                do: "bg-[var(--chess-light-square,oklch(85%_0.05_72))]",
+                else: "bg-[var(--chess-dark-square,oklch(55%_0.06_62))]"
 
-              # Determine piece color class
-              piece_color_class =
-                if piece do
-                  if String.upcase(piece) == piece,
-                    do: "chess-piece-white",
-                    else: "chess-piece-black"
-                end
-            %>
+            # Determine piece color class
+            piece_color_class =
+              if piece do
+                if String.upcase(piece) == piece,
+                  do: "chess-piece-white",
+                  else: "chess-piece-black"
+              end %>
             <div class={[
               "aspect-square flex items-center justify-center relative overflow-hidden",
               "select-none cursor-pointer",
@@ -157,21 +155,17 @@ defmodule BughouseWeb.ChessComponents do
 
               <%= if @show_coordinates do %>
                 <%= if file_idx == 0 do %>
-                  <%
-                    # Rank number: 8 at top, 1 at bottom (when not flipped)
-                    # After flipping, 1 at top, 8 at bottom
-                    rank_number = if @flip, do: rank_idx + 1, else: 8 - rank_idx
-                  %>
+                  <% # Rank number: 8 at top, 1 at bottom (when not flipped)
+                  # After flipping, 1 at top, 8 at bottom
+                  rank_number = if @flip, do: rank_idx + 1, else: 8 - rank_idx %>
                   <span class="absolute bottom-0.5 left-0.5 text-[0.6rem] opacity-60 font-semibold pointer-events-none">
                     {rank_number}
                   </span>
                 <% end %>
                 <%= if rank_idx == 7 do %>
-                  <%
-                    # File letter: a-h from left to right (when not flipped)
-                    # After flipping, h-a from left to right
-                    file_letter = if @flip, do: ?h - file_idx, else: ?a + file_idx
-                  %>
+                  <% # File letter: a-h from left to right (when not flipped)
+                  # After flipping, h-a from left to right
+                  file_letter = if @flip, do: ?h - file_idx, else: ?a + file_idx %>
                   <span class="absolute top-0.5 right-0.5 text-[0.6rem] opacity-60 font-semibold pointer-events-none">
                     {<<file_letter>>}
                   </span>
@@ -306,8 +300,8 @@ defmodule BughouseWeb.ChessComponents do
             <span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
           </span>
         <% end %>
-
-        <!-- Lag warning indicator -->
+        
+    <!-- Lag warning indicator -->
         <div
           class="absolute -top-3 left-1/2 transform -translate-x-1/2 hidden"
           data-lag-warning
@@ -330,19 +324,19 @@ defmodule BughouseWeb.ChessComponents do
             <span>Connection slow</span>
           </div>
         </div>
-
-        <!-- Minutes -->
+        
+    <!-- Minutes -->
         <span class="tabular-nums">
           {String.pad_leading(to_string(@minutes), 2, "0")}
         </span>
         <span class={[@active && "animate-pulse"]}>:</span>
-
-        <!-- Seconds -->
+        
+    <!-- Seconds -->
         <span class="tabular-nums">
           {String.pad_leading(to_string(@seconds), 2, "0")}
         </span>
-
-        <!-- Tenths of a second -->
+        
+    <!-- Tenths of a second -->
         <span class="text-2xl opacity-75">.</span>
         <span class="tabular-nums text-2xl">
           {@tenths}

@@ -81,7 +81,7 @@ defmodule BughouseWeb.LobbyLive do
 
   def handle_event("start_game", _params, socket) do
     case Games.start_game(socket.assigns.game.id) do
-      {:ok, _} ->
+      {:ok, _game, _pid} ->
         {:noreply, socket}
 
       {:error, :not_enough_players} ->
@@ -156,159 +156,159 @@ defmodule BughouseWeb.LobbyLive do
     ~H"""
     <div class="container mx-auto px-4 py-8">
       <div class="max-w-6xl mx-auto">
-          <h1 class="text-4xl font-bold mb-8 text-center">Game Lobby</h1>
-          <!-- Invite Code Card -->
-          <div class="card bg-base-200 mb-6">
-            <div class="card-body">
-              <h2 class="card-title">Invite Your Friends</h2>
-              <p class="mb-4">Share this link to invite players:</p>
+        <h1 class="text-4xl font-bold mb-8 text-center">Game Lobby</h1>
+        <!-- Invite Code Card -->
+        <div class="card bg-base-200 mb-6">
+          <div class="card-body">
+            <h2 class="card-title">Invite Your Friends</h2>
+            <p class="mb-4">Share this link to invite players:</p>
 
-              <div class="flex gap-2 items-center">
-                <input
-                  type="text"
-                  readonly
-                  value={@share_url}
-                  class="input input-bordered flex-1 font-mono text-sm"
-                  id="share-url-input"
-                />
-                <button
-                  class="btn btn-primary"
-                  onclick={"navigator.clipboard.writeText('#{@share_url}')"}
-                >
-                  Copy Link
-                </button>
-              </div>
+            <div class="flex gap-2 items-center">
+              <input
+                type="text"
+                readonly
+                value={@share_url}
+                class="input input-bordered flex-1 font-mono text-sm"
+                id="share-url-input"
+              />
+              <button
+                class="btn btn-primary"
+                onclick={"navigator.clipboard.writeText('#{@share_url}')"}
+              >
+                Copy Link
+              </button>
+            </div>
 
-              <div class="bg-base-300 p-4 rounded-lg text-center mt-4">
-                <span class="text-sm text-base-content/70">Invite Code:</span>
-                <code class="text-2xl font-mono font-bold block">{@invite_code}</code>
-              </div>
+            <div class="bg-base-300 p-4 rounded-lg text-center mt-4">
+              <span class="text-sm text-base-content/70">Invite Code:</span>
+              <code class="text-2xl font-mono font-bold block">{@invite_code}</code>
             </div>
           </div>
-          <!-- Bughouse Table Layout -->
-          <div class="card bg-base-200 mb-6">
-            <div class="card-body">
-              <div class="flex items-center justify-between mb-4">
-                <h2 class="card-title">Bughouse Table</h2>
-                <button
-                  :if={@my_position == nil and @game.status == :waiting}
-                  class="btn btn-success"
-                  phx-click="quick_join"
-                >
-                  Quick Join
-                </button>
+        </div>
+        <!-- Bughouse Table Layout -->
+        <div class="card bg-base-200 mb-6">
+          <div class="card-body">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="card-title">Bughouse Table</h2>
+              <button
+                :if={@my_position == nil and @game.status == :waiting}
+                class="btn btn-success"
+                phx-click="quick_join"
+              >
+                Quick Join
+              </button>
+            </div>
+            <!-- Team 2 (Top Side) -->
+            <div class="mb-3">
+              <div class="text-xs font-semibold text-center mb-2 opacity-50">Team 2</div>
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <.player_seat
+                  position={:board_1_black}
+                  color="Black"
+                  board="A"
+                  game={@game}
+                  players={@players}
+                  my_position={@my_position}
+                />
+                <.player_seat
+                  position={:board_2_white}
+                  color="White"
+                  board="B"
+                  game={@game}
+                  players={@players}
+                  my_position={@my_position}
+                />
               </div>
-              <!-- Team 2 (Top Side) -->
-              <div class="mb-3">
-                <div class="text-xs font-semibold text-center mb-2 opacity-50">Team 2</div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <.player_seat
-                    position={:board_1_black}
-                    color="Black"
-                    board="A"
-                    game={@game}
-                    players={@players}
-                    my_position={@my_position}
-                  />
-                  <.player_seat
-                    position={:board_2_white}
-                    color="White"
-                    board="B"
-                    game={@game}
-                    players={@players}
-                    my_position={@my_position}
-                  />
-                </div>
+            </div>
+            <!-- Two Boards Side by Side -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 my-6">
+              <!-- Board A (White bottom) -->
+              <div class="flex flex-col items-center">
+                <div class="text-sm font-semibold mb-2 opacity-70">Board A</div>
+                <.chess_board
+                  fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+                  size="lg"
+                  flip={false}
+                />
               </div>
-              <!-- Two Boards Side by Side -->
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 my-6">
-                <!-- Board A (White bottom) -->
-                <div class="flex flex-col items-center">
-                  <div class="text-sm font-semibold mb-2 opacity-70">Board A</div>
-                  <.chess_board
-                    fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
-                    size="lg"
-                    flip={false}
-                  />
-                </div>
-                <!-- Board B (Black bottom) -->
-                <div class="flex flex-col items-center">
-                  <div class="text-sm font-semibold mb-2 opacity-70">Board B</div>
-                  <.chess_board
-                    fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
-                    size="lg"
-                    flip={true}
-                  />
-                </div>
+              <!-- Board B (Black bottom) -->
+              <div class="flex flex-col items-center">
+                <div class="text-sm font-semibold mb-2 opacity-70">Board B</div>
+                <.chess_board
+                  fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+                  size="lg"
+                  flip={true}
+                />
               </div>
-              <!-- Team 1 (Bottom Side) -->
-              <div class="mb-4">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <.player_seat
-                    position={:board_1_white}
-                    color="White"
-                    board="A"
-                    game={@game}
-                    players={@players}
-                    my_position={@my_position}
-                  />
-                  <.player_seat
-                    position={:board_2_black}
-                    color="Black"
-                    board="B"
-                    game={@game}
-                    players={@players}
-                    my_position={@my_position}
-                  />
-                </div>
-                <div class="text-xs font-semibold text-center mt-2 opacity-50">Team 1</div>
+            </div>
+            <!-- Team 1 (Bottom Side) -->
+            <div class="mb-4">
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <.player_seat
+                  position={:board_1_white}
+                  color="White"
+                  board="A"
+                  game={@game}
+                  players={@players}
+                  my_position={@my_position}
+                />
+                <.player_seat
+                  position={:board_2_black}
+                  color="Black"
+                  board="B"
+                  game={@game}
+                  players={@players}
+                  my_position={@my_position}
+                />
               </div>
-              <!-- Chess Board Theme Selector -->
-              <div class="bg-base-300 rounded-lg p-4 mb-4">
-                <.chess_board_theme_selector />
+              <div class="text-xs font-semibold text-center mt-2 opacity-50">Team 1</div>
+            </div>
+            <!-- Chess Board Theme Selector -->
+            <div class="bg-base-300 rounded-lg p-4 mb-4">
+              <.chess_board_theme_selector />
+            </div>
+            <!-- Team Info -->
+            <div class="alert alert-info mb-4">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                class="stroke-current shrink-0 w-6 h-6"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div class="text-sm">
+                <strong>Teams:</strong>
+                Team 1 (White/A + Black/B) vs Team 2 (Black/A + White/B) · Partners sit next to each other
               </div>
-              <!-- Team Info -->
-              <div class="alert alert-info mb-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  class="stroke-current shrink-0 w-6 h-6"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <div class="text-sm">
-                  <strong>Teams:</strong>
-                  Team 1 (White/A + Black/B) vs Team 2 (Black/A + White/B) · Partners sit next to each other
-                </div>
-              </div>
-              <!-- Action Buttons -->
-              <div class="card-actions justify-end">
-                <button
-                  :if={@my_position != nil}
-                  class="btn btn-ghost"
-                  phx-click="leave_game"
-                >
-                  Leave Game
-                </button>
+            </div>
+            <!-- Action Buttons -->
+            <div class="card-actions justify-end">
+              <button
+                :if={@my_position != nil}
+                class="btn btn-ghost"
+                phx-click="leave_game"
+              >
+                Leave Game
+              </button>
 
-                <button
-                  class="btn btn-primary"
-                  phx-click="start_game"
-                  disabled={!can_start_game?(@game)}
-                >
-                  {if can_start_game?(@game), do: "Start Game", else: "Waiting for Players..."}
-                </button>
-              </div>
+              <button
+                class="btn btn-primary"
+                phx-click="start_game"
+                disabled={!can_start_game?(@game)}
+              >
+                {if can_start_game?(@game), do: "Start Game", else: "Waiting for Players..."}
+              </button>
             </div>
           </div>
         </div>
       </div>
+    </div>
     """
   end
 

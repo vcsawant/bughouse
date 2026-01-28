@@ -1,4 +1,4 @@
-defmodule Bughouse.Games.GamePlayer do
+defmodule Bughouse.Schemas.Games.GamePlayer do
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -6,8 +6,8 @@ defmodule Bughouse.Games.GamePlayer do
   @foreign_key_type :binary_id
 
   schema "game_players" do
-    belongs_to :game, Bughouse.Games.Game
-    belongs_to :player, Bughouse.Accounts.Player
+    belongs_to :game, Bughouse.Schemas.Games.Game
+    belongs_to :player, Bughouse.Schemas.Accounts.Player
 
     field :position, :string
     field :color, :string

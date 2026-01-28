@@ -1,4 +1,4 @@
-defmodule Bughouse.Accounts.Player do
+defmodule Bughouse.Schemas.Accounts.Player do
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -16,9 +16,9 @@ defmodule Bughouse.Accounts.Player do
     field :guest, :boolean
     field :email, :string
 
-    has_many :game_players, Bughouse.Games.GamePlayer
+    has_many :game_players, Bughouse.Schemas.Games.GamePlayer
     has_many :games, through: [:game_players, :game]
-    has_many :friendships, Bughouse.Accounts.Friendship
+    has_many :friendships, Bughouse.Schemas.Accounts.Friendship
 
     timestamps(type: :utc_datetime)
   end

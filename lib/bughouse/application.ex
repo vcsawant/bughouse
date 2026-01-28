@@ -12,6 +12,10 @@ defmodule Bughouse.Application do
       Bughouse.Repo,
       {DNSCluster, query: Application.get_env(:bughouse, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Bughouse.PubSub},
+      # Registry for game server name registration
+      {Registry, keys: :unique, name: Bughouse.Games.Registry},
+      # Dynamic supervisor for game servers
+      {DynamicSupervisor, name: Bughouse.Games.GameSupervisor, strategy: :one_for_one},
       # Start a worker by calling: Bughouse.Worker.start_link(arg)
       # {Bughouse.Worker, arg},
       # Start to serve requests, typically the last entry
