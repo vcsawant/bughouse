@@ -12,11 +12,26 @@ defmodule BughouseWeb.UserAuth do
   @doc """
   Creates a guest player for the current connection.
 
-  In MVP, a new guest is created each time.  In the future, this will
-  check session and reuse existing guests.
+  Checks session for existing player first. If found, uses that player.
+  Otherwise, creates a new guest player.
   """
-  def on_mount(:ensure_guest_player, _params, _session, socket) do
-    {:ok, player} = Accounts.create_guest_player()
+  def on_mount(:ensure_guest_player, _params, session, socket) do
+    player =
+      case session["current_player_id"] do
+        nil ->
+          {:ok, player} = Accounts.create_guest_player()
+          player
+
+        player_id ->
+          case Accounts.get_player(player_id) do
+            nil ->
+              {:ok, player} = Accounts.create_guest_player()
+              player
+
+            player ->
+              player
+          end
+      end
 
     socket = assign(socket, :current_player, player)
 

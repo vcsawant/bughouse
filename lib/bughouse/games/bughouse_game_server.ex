@@ -721,21 +721,45 @@ defmodule Bughouse.Games.BughouseGameServer do
   defp serialize_state_for_client(state) do
     {:ok, board_1_fen} = :binbo_bughouse.get_fen(state.board_1_pid)
     {:ok, board_2_fen} = :binbo_bughouse.get_fen(state.board_2_pid)
+    {:ok, board_1_reserves} = :binbo_bughouse.get_reserves(state.board_1_pid)
+    {:ok, board_2_reserves} = :binbo_bughouse.get_reserves(state.board_2_pid)
 
     # Calculate current clock values (subtract elapsed time from active clocks)
     now = System.monotonic_time(:millisecond)
     current_clocks = calculate_current_clocks(state, now)
 
     %{
-      board_1_fen: to_string(board_1_fen),
-      board_2_fen: to_string(board_2_fen),
+      # Extract only piece placement (first part of FEN before space)
+      # Full FEN: "rnbqkbnr/pppppppp/.../RNBQKBNR w KQkq - 0 1"
+      # We only need: "rnbqkbnr/pppppppp/.../RNBQKBNR"
+      board_1_fen: extract_piece_placement(board_1_fen),
+      board_2_fen: extract_piece_placement(board_2_fen),
       clocks: current_clocks,
       active_clocks: MapSet.to_list(state.active_clocks),
+      reserves: %{
+        # Pieces captured on board 1 go to board 2 player's reserves
+        # Pieces captured on board 2 go to board 1 player's reserves
+        board_1_white: board_2_reserves.black,
+        board_1_black: board_2_reserves.white,
+        board_2_white: board_1_reserves.black,
+        board_2_black: board_1_reserves.white
+      },
       last_move: List.first(state.move_history),
       result: state.result,
       result_reason: state.result_reason
     }
   end
+
+  # Extract piece placement from full FEN string
+  # FEN format: "piece_placement active_color castling en_passant halfmove fullmove"
+  # Returns only the piece_placement part
+  defp extract_piece_placement(fen) when is_binary(fen) do
+    fen
+    |> String.split(" ", parts: 2)
+    |> List.first()
+  end
+
+  defp extract_piece_placement(fen), do: to_string(fen)
 
   ## Child Spec
 

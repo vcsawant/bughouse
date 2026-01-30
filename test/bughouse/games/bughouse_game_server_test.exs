@@ -150,9 +150,9 @@ defmodule Bughouse.Games.BughouseGameServerTest do
     test "starts with correct initial state", %{pid: pid} do
       state = TestHelpers.get_state(pid)
 
-      # Verify board setup (initial position FEN)
-      assert state.board_1_fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-      assert state.board_2_fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+      # Verify board setup (simplified FEN with only piece placement)
+      assert state.board_1_fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+      assert state.board_2_fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 
       # Verify clocks (5 minutes = 300,000 ms)
       assert state.clocks.board_1_white == 300_000

@@ -25,6 +25,7 @@ defmodule BughouseWeb.Router do
       on_mount: [{BughouseWeb.UserAuth, :ensure_guest_player}],
       layout: {BughouseWeb.Layouts, :app} do
       live "/lobby/:invite_code", LobbyLive
+      live "/game/:invite_code", GameLive
     end
   end
 

@@ -25,52 +25,91 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/bughouse"
 import topbar from "../vendor/topbar"
 
-// Chess Clock Monitoring Hook
-// Detects when timer updates are stale (connection lag/disconnect)
-const ChessClockMonitor = {
+// Chess Clock Countdown Hook
+// Counts down client-side and reconciles with server updates
+const ChessClockCountdown = {
   mounted() {
-    this.checkInterval = setInterval(() => this.checkStaleness(), 1000)
-    this.lagWarning = this.el.querySelector('[data-lag-warning]')
-    this.activeIndicator = this.el.querySelector('[data-active-indicator]')
+    this.timeMs = parseInt(this.el.dataset.timeMs) || 0
+    // Check if data-active attribute exists (boolean attribute pattern)
+    // Phoenix renders: active={true} → data-active (no value), active={false} → no attribute
+    this.active = this.el.hasAttribute('data-active')
+
+    // Get countdown elements (the inner spans with --value style)
+    // DaisyUI countdown structure: <span class="countdown"><span style="--value:X"></span></span>
+    const minutesContainer = this.el.querySelector('[data-minutes]')
+    const secondsContainer = this.el.querySelector('[data-seconds]')
+
+    // Get the inner span elements that hold the --value
+    this.minutesEl = minutesContainer?.querySelector('span')
+    this.secondsEl = secondsContainer?.querySelector('span')
+
+    // Start countdown if active
+    if (this.active) {
+      this.startCountdown()
+    }
+
+    this.updateDisplay()
   },
 
   updated() {
-    // Reset staleness check when we receive an update
-    this.lastUpdateTime = Date.now()
-    if (this.lagWarning) {
-      this.lagWarning.classList.add('hidden')
+    // Reconcile with server time
+    const newTimeMs = parseInt(this.el.dataset.timeMs) || 0
+    // Check if data-active attribute exists (boolean attribute pattern)
+    const newActive = this.el.hasAttribute('data-active')
+
+    // Update time from server (reconciliation)
+    this.timeMs = newTimeMs
+
+    // Handle active state change
+    if (newActive && !this.active) {
+      this.startCountdown()
+    } else if (!newActive && this.active) {
+      this.stopCountdown()
+    }
+
+    this.active = newActive
+    this.updateDisplay()
+  },
+
+  startCountdown() {
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval)
+    }
+
+    // Update every 1000ms for second precision (MM:SS format)
+    this.countdownInterval = setInterval(() => {
+      if (this.timeMs > 0) {
+        this.timeMs = Math.max(0, this.timeMs - 1000)
+        this.updateDisplay()
+      } else {
+        this.stopCountdown()
+      }
+    }, 1000)
+  },
+
+  stopCountdown() {
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval)
+      this.countdownInterval = null
     }
   },
 
-  checkStaleness() {
-    const lastUpdate = parseInt(this.el.dataset.lastUpdate) || Date.now()
-    const now = Date.now()
-    const staleness = now - lastUpdate
-
-    // Show warning if no update in 5 seconds
-    const STALE_THRESHOLD = 5000
-
-    if (staleness > STALE_THRESHOLD && this.lagWarning) {
-      this.lagWarning.classList.remove('hidden')
-
-      // Also dim the active indicator if present
-      if (this.activeIndicator) {
-        this.activeIndicator.style.opacity = '0.3'
-      }
-    } else {
-      if (this.lagWarning) {
-        this.lagWarning.classList.add('hidden')
-      }
-      if (this.activeIndicator) {
-        this.activeIndicator.style.opacity = '1'
-      }
+  updateDisplay() {
+    if (!this.minutesEl || !this.secondsEl) {
+      return
     }
+
+    const totalSeconds = Math.floor(this.timeMs / 1000)
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+
+    // Update DaisyUI countdown values on the inner span elements
+    this.minutesEl.style.setProperty('--value', minutes)
+    this.secondsEl.style.setProperty('--value', seconds)
   },
 
   destroyed() {
-    if (this.checkInterval) {
-      clearInterval(this.checkInterval)
-    }
+    this.stopCountdown()
   }
 }
 
@@ -80,7 +119,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
   params: {_csrf_token: csrfToken},
   hooks: {
     ...colocatedHooks,
-    ChessClockMonitor
+    ChessClockCountdown
   },
 })
 
