@@ -25,10 +25,64 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/bughouse"
 import topbar from "../vendor/topbar"
 
+// Shared clock state manager - ensures all clocks tick in sync
+const ClockManager = {
+  // Single master interval for all clocks
+  interval: null,
+
+  // List of registered clock hooks (max 4 in Bughouse)
+  clocks: [],
+
+  // Start the master interval if not already running
+  start() {
+    if (!this.interval) {
+      this.interval = setInterval(() => {
+        this.tick()
+      }, 1000)
+    }
+  },
+
+  // Stop the master interval (when all clocks destroyed)
+  stop() {
+    if (this.interval) {
+      clearInterval(this.interval)
+      this.interval = null
+    }
+  },
+
+  // Tick all registered active clocks
+  tick() {
+    for (const clock of this.clocks) {
+      if (clock.active && clock.timeMs > 0) {
+        clock.timeMs = Math.max(0, clock.timeMs - 1000)
+        clock.updateDisplay()
+      }
+    }
+  },
+
+  // Register a clock hook
+  register(clock) {
+    this.clocks.push(clock)
+    this.start()
+  },
+
+  // Unregister a clock hook
+  unregister(clock) {
+    const index = this.clocks.indexOf(clock)
+    if (index > -1) {
+      this.clocks.splice(index, 1)
+    }
+    if (this.clocks.length === 0) {
+      this.stop()
+    }
+  }
+}
+
 // Chess Clock Countdown Hook
 // Counts down client-side and reconciles with server updates
 const ChessClockCountdown = {
   mounted() {
+    // Initialize time and active state
     this.timeMs = parseInt(this.el.dataset.timeMs) || 0
     // Check if data-active attribute exists (boolean attribute pattern)
     // Phoenix renders: active={true} → data-active (no value), active={false} → no attribute
@@ -43,11 +97,10 @@ const ChessClockCountdown = {
     this.minutesEl = minutesContainer?.querySelector('span')
     this.secondsEl = secondsContainer?.querySelector('span')
 
-    // Start countdown if active
-    if (this.active) {
-      this.startCountdown()
-    }
+    // Register with the shared manager
+    ClockManager.register(this)
 
+    // Initial display update
     this.updateDisplay()
   },
 
@@ -78,39 +131,11 @@ const ChessClockCountdown = {
     }
     // Otherwise, let active clock continue counting smoothly
 
-    // Handle active state change
-    if (newActive && !this.active) {
-      this.startCountdown()
-    } else if (!newActive && this.active) {
-      this.stopCountdown()
-    }
-
+    // Update active state - ClockManager will handle ticking based on this flag
     this.active = newActive
     this.updateDisplay()
   },
 
-  startCountdown() {
-    if (this.countdownInterval) {
-      clearInterval(this.countdownInterval)
-    }
-
-    // Update every 1000ms for second precision (MM:SS format)
-    this.countdownInterval = setInterval(() => {
-      if (this.timeMs > 0) {
-        this.timeMs = Math.max(0, this.timeMs - 1000)
-        this.updateDisplay()
-      } else {
-        this.stopCountdown()
-      }
-    }, 1000)
-  },
-
-  stopCountdown() {
-    if (this.countdownInterval) {
-      clearInterval(this.countdownInterval)
-      this.countdownInterval = null
-    }
-  },
 
   updateDisplay() {
     if (!this.minutesEl || !this.secondsEl) {
@@ -127,7 +152,8 @@ const ChessClockCountdown = {
   },
 
   destroyed() {
-    this.stopCountdown()
+    // Unregister from the shared manager
+    ClockManager.unregister(this)
   }
 }
 
