@@ -561,6 +561,9 @@ defmodule BughouseWeb.ChessComponents do
     # Determine board size
     size_class = "w-96 h-96"
 
+    # Check if this is the current player's board
+    is_my_board = is_players_board?(assigns.my_position, assigns.board_num)
+
     # Prepare board data for rendering
     display_board =
       if assigns.flip do
@@ -575,6 +578,7 @@ defmodule BughouseWeb.ChessComponents do
       assigns
       |> assign(:board, display_board)
       |> assign(:size_class, size_class)
+      |> assign(:is_my_board, is_my_board)
 
     ~H"""
     <div class="relative inline-block">
@@ -606,9 +610,11 @@ defmodule BughouseWeb.ChessComponents do
               end
 
             # Check if this square is selected or highlighted
-            is_selected = @selected_square == square_notation
-            is_highlighted = square_notation in @highlighted_squares
-            has_drop_target = @selected_reserve_piece != nil %>
+            # Only show selection/highlights on player's own board
+            is_selected = @selected_square == square_notation && @is_my_board
+            is_highlighted = square_notation in @highlighted_squares && @is_my_board
+            # Only show drop targets on player's own board
+            has_drop_target = @selected_reserve_piece != nil && @is_my_board %>
             <div
               class={[
                 "aspect-square flex items-center justify-center relative overflow-hidden",
@@ -758,6 +764,13 @@ defmodule BughouseWeb.ChessComponents do
   defp get_position_board(:board_1_black), do: 1
   defp get_position_board(:board_2_white), do: 2
   defp get_position_board(:board_2_black), do: 2
+  defp get_position_board(nil), do: nil
+
+  # Check if a board number matches the player's position
+  defp is_players_board?(nil, _board_num), do: false
+  defp is_players_board?(position, board_num) do
+    get_position_board(position) == board_num
+  end
 
   defp format_result_message(:team_1, reason), do: "Team 1 wins! #{reason}"
   defp format_result_message(:team_2, reason), do: "Team 2 wins! #{reason}"

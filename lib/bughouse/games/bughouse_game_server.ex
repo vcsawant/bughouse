@@ -91,6 +91,15 @@ defmodule Bughouse.Games.BughouseGameServer do
   end
 
   @doc """
+  Validates if a player can select a piece at the given square.
+  Returns :ok if valid, {:error, reason} otherwise.
+  """
+  @spec can_select_piece?(pid(), binary(), String.t()) :: :ok | {:error, atom()}
+  def can_select_piece?(pid, player_id, square) do
+    GenServer.call(pid, {:can_select_piece, player_id, square})
+  end
+
+  @doc """
   Gets current game state for client.
   """
   @spec get_state(pid()) :: {:ok, map()}
@@ -350,6 +359,36 @@ defmodule Bughouse.Games.BughouseGameServer do
   end
 
   @impl true
+  def handle_call({:can_select_piece, player_id, square}, _from, state) do
+    if state.result != nil do
+      {:reply, {:error, :game_over}, state}
+    else
+      position = get_player_position(state, player_id)
+
+      # Check if player is in the game
+      if position == nil do
+        {:reply, {:error, :not_in_game}, state}
+      # Check if it's the player's turn
+      else if not MapSet.member?(state.active_clocks, position) do
+        {:reply, {:error, :not_your_turn}, state}
+      else
+        # Get the board and check if there's a valid piece at the square
+        {_board_num, board_pid} = get_board_for_position(state, position)
+        player_color = position_to_color(position)
+
+        case get_piece_at_square(board_pid, square, player_color) do
+          :ok ->
+            {:reply, :ok, state}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+        end
+      end
+      end
+    end
+  end
+
+  @impl true
   def handle_call(:get_state, _from, state) do
     client_state = serialize_state_for_client(state)
     {:reply, {:ok, client_state}, state}
@@ -559,13 +598,96 @@ defmodule Bughouse.Games.BughouseGameServer do
   defp binbo_winner_to_team(:white_wins, 2), do: :team_2
   defp binbo_winner_to_team(:black_wins, 2), do: :team_1
 
+  defp position_to_color(:board_1_white), do: :white
+  defp position_to_color(:board_1_black), do: :black
+  defp position_to_color(:board_2_white), do: :white
+  defp position_to_color(:board_2_black), do: :black
+
+  # Validate that there's a piece at the square that belongs to the player
+  defp get_piece_at_square(board_pid, square, player_color) do
+    {:ok, fen} = :binbo_bughouse.get_fen(board_pid)
+    piece_placement = extract_piece_placement(fen)
+
+    case parse_square_piece(piece_placement, square) do
+      nil ->
+        {:error, :empty_square}
+
+      piece ->
+        piece_color = if String.upcase(piece) == piece, do: :white, else: :black
+
+        if piece_color == player_color do
+          :ok
+        else
+          {:error, :opponent_piece}
+        end
+    end
+  end
+
+  # Parse FEN to get the piece at a specific square (e.g., "e2")
+  defp parse_square_piece(fen, square) do
+    <<file_char, rank_char>> = square
+    file = file_char - ?a  # 0-7 (a-h)
+    rank = 8 - (rank_char - ?0)  # 0-7 (rank 8 is index 0)
+
+    ranks = String.split(fen, "/")
+
+    if rank >= 0 and rank < length(ranks) do
+      rank_string = Enum.at(ranks, rank)
+      parse_file_in_rank(rank_string, file)
+    else
+      nil
+    end
+  end
+
+  # Parse a rank string to get the piece at a specific file index
+  defp parse_file_in_rank(rank_string, target_file) do
+    rank_string
+    |> String.graphemes()
+    |> Enum.reduce_while({0, nil}, fn char, {current_file, _} ->
+      case Integer.parse(char) do
+        {num, ""} ->
+          # Empty squares - advance file index
+          new_file = current_file + num
+
+          if target_file < new_file do
+            # Target is in the empty squares
+            {:halt, {current_file, nil}}
+          else
+            {:cont, {new_file, nil}}
+          end
+
+        :error ->
+          # It's a piece character
+          if current_file == target_file do
+            {:halt, {current_file, char}}
+          else
+            {:cont, {current_file + 1, nil}}
+          end
+      end
+    end)
+    |> elem(1)
+  end
+
   defp end_game(state, result, reason, details) do
+    # Cancel all timeout timers
+    for {_position, ref} <- state.timeout_refs, ref != nil do
+      Process.cancel_timer(ref)
+    end
+
     %{
       state
       | result: result,
         result_reason: reason,
         result_details: details,
-        result_timestamp: DateTime.utc_now()
+        result_timestamp: DateTime.utc_now(),
+        # Clear all active clocks when game ends
+        active_clocks: MapSet.new(),
+        timeout_refs: %{
+          board_1_white: nil,
+          board_1_black: nil,
+          board_2_white: nil,
+          board_2_black: nil
+        }
     }
   end
 
@@ -731,18 +853,19 @@ defmodule Bughouse.Games.BughouseGameServer do
     %{
       # Extract only piece placement (first part of FEN before space)
       # Full FEN: "rnbqkbnr/pppppppp/.../RNBQKBNR w KQkq - 0 1"
+      # If there are reserved pieces "rnbqkbnr/pppppppp/.../RNBQKBNR[ppr] w KQkq - 0 1"
       # We only need: "rnbqkbnr/pppppppp/.../RNBQKBNR"
       board_1_fen: extract_piece_placement(board_1_fen),
       board_2_fen: extract_piece_placement(board_2_fen),
       clocks: current_clocks,
       active_clocks: MapSet.to_list(state.active_clocks),
       reserves: %{
-        # Pieces captured on board 1 go to board 2 player's reserves
-        # Pieces captured on board 2 go to board 1 player's reserves
-        board_1_white: board_2_reserves.black,
-        board_1_black: board_2_reserves.white,
-        board_2_white: board_1_reserves.black,
-        board_2_black: board_1_reserves.white
+        # Each player's reserves are stored on their own board with their own color
+        # When a teammate captures a piece, it's added to this player's reserves
+        board_1_white: board_1_reserves.white,
+        board_1_black: board_1_reserves.black,
+        board_2_white: board_2_reserves.white,
+        board_2_black: board_2_reserves.black
       },
       last_move: List.first(state.move_history),
       result: state.result,
@@ -755,7 +878,7 @@ defmodule Bughouse.Games.BughouseGameServer do
   # Returns only the piece_placement part
   defp extract_piece_placement(fen) when is_binary(fen) do
     fen
-    |> String.split(" ", parts: 2)
+    |> String.split([" ", "["], parts: 2)
     |> List.first()
   end
 

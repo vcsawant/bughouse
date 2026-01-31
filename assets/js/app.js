@@ -52,11 +52,19 @@ const ClockManager = {
 
   // Tick all registered active clocks
   tick() {
+    let hasActiveClock = false
+
     for (const clock of this.clocks) {
       if (clock.active && clock.timeMs > 0) {
+        hasActiveClock = true
         clock.timeMs = Math.max(0, clock.timeMs - 1000)
         clock.updateDisplay()
       }
+    }
+
+    // Stop the interval if no clocks are active (e.g., game ended)
+    if (!hasActiveClock && this.clocks.length > 0) {
+      this.stop()
     }
   },
 

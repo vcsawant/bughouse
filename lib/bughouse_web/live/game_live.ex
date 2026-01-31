@@ -8,8 +8,8 @@ defmodule BughouseWeb.GameLive do
 
   ## Layout
 
-  - Team 2 players displayed at top (board_1_black, board_2_white)
-  - Team 1 players displayed at bottom (board_1_white, board_2_black)
+  - Team 2's players displayed at top (board_1_black, board_2_white)
+  - Team 1's players displayed at bottom (board_1_white, board_2_black)
   - Clocks and reserves positioned above/below boards respectively
   - Each player sees their own board pieces at the bottom (flipped orientation)
 
@@ -101,8 +101,20 @@ defmodule BughouseWeb.GameLive do
           if socket.assigns.selected_square do
             handle_move_attempt(socket, socket.assigns.selected_square, square)
           else
-            # Select the square
-            {:noreply, assign(socket, selected_square: square, highlighted_squares: [])}
+            # Validate piece selection with game server
+            player_id = socket.assigns.current_player.id
+
+            case Games.can_select_piece?(socket.assigns.game.id, player_id, square) do
+              :ok ->
+                # Valid piece - select it
+                # TODO: Get valid moves from server and set highlighted_squares
+                {:noreply, assign(socket, selected_square: square, highlighted_squares: [])}
+
+              {:error, _reason} ->
+                # Invalid selection (empty square, opponent's piece, or not player's turn)
+                # Silently ignore - don't select anything
+                {:noreply, socket}
+            end
           end
         end
       end

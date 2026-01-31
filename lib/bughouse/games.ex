@@ -494,6 +494,16 @@ defmodule Bughouse.Games do
     end
   end
 
+  @doc """
+  Validates if a player can select a piece at the given square.
+  Returns :ok if valid, {:error, reason} otherwise.
+  """
+  def can_select_piece?(game_id, player_id, square) do
+    with {:ok, pid} <- get_game_server(game_id) do
+      Bughouse.Games.BughouseGameServer.can_select_piece?(pid, player_id, square)
+    end
+  end
+
   defp generate_invite_code do
     :crypto.strong_rand_bytes(4)
     |> Base.encode16()
