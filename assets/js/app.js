@@ -52,13 +52,31 @@ const ChessClockCountdown = {
   },
 
   updated() {
+    // Re-query DOM elements in case LiveView replaced them during re-render
+    const minutesContainer = this.el.querySelector('[data-minutes]')
+    const secondsContainer = this.el.querySelector('[data-seconds]')
+    this.minutesEl = minutesContainer?.querySelector('span')
+    this.secondsEl = secondsContainer?.querySelector('span')
+
     // Reconcile with server time
     const newTimeMs = parseInt(this.el.dataset.timeMs) || 0
     // Check if data-active attribute exists (boolean attribute pattern)
     const newActive = this.el.hasAttribute('data-active')
 
-    // Update time from server (reconciliation)
-    this.timeMs = newTimeMs
+    // Determine if we should reset the time
+    const isStateChanging = newActive !== this.active
+    const isInactive = !this.active && !newActive
+    const drift = Math.abs(this.timeMs - newTimeMs)
+    const hasSignificantDrift = drift > 2000 // More than 2 seconds off
+
+    // Only reset time when:
+    // 1. Clock state is changing (becoming active/inactive)
+    // 2. Clock is currently inactive (always sync inactive clocks)
+    // 3. Time has drifted significantly from server (desync recovery)
+    if (isStateChanging || isInactive || hasSignificantDrift) {
+      this.timeMs = newTimeMs
+    }
+    // Otherwise, let active clock continue counting smoothly
 
     // Handle active state change
     if (newActive && !this.active) {

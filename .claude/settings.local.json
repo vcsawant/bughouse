@@ -36,7 +36,8 @@
       "Bash(rebar3 clean:*)",
       "Bash(mix deps.compile:*)",
       "Bash(mix clean:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(npm run build)"
     ]
   },
   "outputStyle": "Explanatory"

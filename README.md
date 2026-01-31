@@ -412,6 +412,27 @@ events:
 3. **On Disconnect:** Mark player as disconnected, continue game
 4. **On Reconnect:** Restore player position, sync current state
 
+### Guest Player Session Persistence
+
+Guest players are persisted across page refreshes using HTTP session cookies:
+
+1. **On first visit:** `BughouseWeb.UserAuth.on_mount/4` hook creates a guest player record in the database
+2. **Session storage:** Player ID is written to session via `Phoenix.LiveView.put_session/3`
+3. **On subsequent visits:** Same player ID is retrieved from session cookie and looked up in database
+4. **If session player deleted:** New guest is created transparently and session is updated
+5. **Session expiry:** Default 14 days (configurable via `:max_age` in session options)
+
+**Session Configuration:**
+- **Storage:** Cookie-based (signed, not encrypted)
+- **Session key:** `"current_player_id"` (binary_id UUID)
+- **Configured in:** `lib/bughouse_web/endpoint.ex`
+
+**Debug Logging:**
+- **Server logs:** Look for "Created guest player" or "Reusing existing guest player" in Phoenix logs
+- **Client logs:** Open browser DevTools → Console → Look for "[Bughouse] GameLive mounted"
+
+This ensures guests maintain their identity, position in games, and can refresh/reconnect without losing their place.
+
 ---
 
 ## 🧪 Testing Strategy

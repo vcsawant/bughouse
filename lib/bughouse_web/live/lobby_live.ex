@@ -4,25 +4,38 @@ defmodule BughouseWeb.LobbyLive do
 
   @impl true
   def mount(%{"invite_code" => code}, _session, socket) do
+    require Logger
     # current_player assigned by on_mount hook
+    current_player = socket.assigns.current_player
+
+    Logger.info(
+      "LobbyLive mount: player=#{current_player.id} (#{current_player.display_name}), code=#{code}"
+    )
 
     case Games.get_game_by_invite_code(code) do
       nil ->
+        Logger.warning("LobbyLive: Game not found for code=#{code}, player=#{current_player.id}")
         {:ok, socket |> put_flash(:error, "Game not found") |> redirect(to: ~p"/")}
 
       _game ->
         # Subscribe to real-time updates (only for connected WebSocket)
-        if connected?(socket), do: Games.subscribe_to_game(code)
+        if connected?(socket) do
+          Games.subscribe_to_game(code)
+          Logger.debug("LobbyLive: Subscribed to game:#{code}")
+        end
 
         # Load game state with player names
         {game, players} = Games.get_game_with_players(code)
+        my_position = find_my_position(game, current_player.id)
+
+        Logger.info("LobbyLive: Loaded game #{game.id}, my_position=#{inspect(my_position)}")
 
         {:ok,
          socket
          |> assign(:invite_code, code)
          |> assign(:game, game)
          |> assign(:players, players)
-         |> assign(:my_position, find_my_position(game, socket.assigns.current_player.id))
+         |> assign(:my_position, my_position)
          |> assign(:share_url, url(socket, ~p"/lobby/#{code}"))}
     end
   end
