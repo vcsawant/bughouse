@@ -64,7 +64,7 @@ defmodule BughouseWeb.PageControllerTest do
   describe "create game" do
     test "POST /game redirects to lobby with invite code", %{conn: conn} do
       conn = post(conn, ~p"/game")
-      assert redirected_to(conn) =~ ~p"/lobby/"
+      assert redirected_to(conn) =~ "/lobby/"
     end
 
     test "POST /game generates a valid invite code format", %{conn: conn} do

@@ -7,7 +7,6 @@ defmodule BughouseWeb.UserAuth do
   """
 
   import Plug.Conn
-  import Phoenix.Component
   alias Bughouse.Accounts
   require Logger
 

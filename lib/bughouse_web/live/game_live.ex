@@ -105,10 +105,16 @@ defmodule BughouseWeb.GameLive do
             player_id = socket.assigns.current_player.id
 
             case Games.can_select_piece?(socket.assigns.game.id, player_id, square) do
-              :ok ->
-                # Valid piece - select it
-                # TODO: Get valid moves from server and set highlighted_squares
-                {:noreply, assign(socket, selected_square: square, highlighted_squares: [])}
+              {:ok, legal_moves} ->
+                # Valid piece - select it and highlight legal move destinations
+                # Extract destination squares from move tuples
+                # Moves are either {from, to} or {from, to, promo}
+                highlighted = Enum.map(legal_moves, fn
+                  {_from, to} -> to
+                  {_from, to, _promo} -> to
+                end)
+
+                {:noreply, assign(socket, selected_square: square, highlighted_squares: highlighted)}
 
               {:error, _reason} ->
                 # Invalid selection (empty square, opponent's piece, or not player's turn)
@@ -229,12 +235,6 @@ defmodule BughouseWeb.GameLive do
   defp get_position_board(:board_2_black), do: 2
   defp get_position_board(nil), do: nil
 
-  defp get_position_color(:board_1_white), do: :white
-  defp get_position_color(:board_1_black), do: :black
-  defp get_position_color(:board_2_white), do: :white
-  defp get_position_color(:board_2_black), do: :black
-  defp get_position_color(nil), do: nil
-
   # Board 1 is always shown normally (white at bottom)
   # Board 2 is always flipped (black at bottom)
   # This matches the physical table layout where players sit in their chosen positions
@@ -245,10 +245,6 @@ defmodule BughouseWeb.GameLive do
   defp get_player_name(players, player_id) do
     Map.get(players, player_id, "Waiting...")
   end
-
-  defp format_result_message(:team_1, reason), do: "Team 1 wins! #{reason}"
-  defp format_result_message(:team_2, reason), do: "Team 2 wins! #{reason}"
-  defp format_result_message(:draw, reason), do: "Game drawn. #{reason}"
 
   @impl true
   def render(assigns) do

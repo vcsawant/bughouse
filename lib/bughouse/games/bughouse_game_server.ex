@@ -377,8 +377,8 @@ defmodule Bughouse.Games.BughouseGameServer do
         player_color = position_to_color(position)
 
         case get_piece_at_square(board_pid, square, player_color) do
-          :ok ->
-            {:reply, :ok, state}
+          {:ok, legal_moves} ->
+            {:reply, {:ok, legal_moves}, state}
 
           {:error, reason} ->
             {:reply, {:error, reason}, state}
@@ -603,69 +603,25 @@ defmodule Bughouse.Games.BughouseGameServer do
   defp position_to_color(:board_2_white), do: :white
   defp position_to_color(:board_2_black), do: :black
 
-  # Validate that there's a piece at the square that belongs to the player
+  # Validate piece at square using binbo_bughouse's select_square
   defp get_piece_at_square(board_pid, square, player_color) do
-    {:ok, fen} = :binbo_bughouse.get_fen(board_pid)
-    piece_placement = extract_piece_placement(fen)
-
-    case parse_square_piece(piece_placement, square) do
-      nil ->
+    case :binbo_bughouse.select_square(board_pid, square) do
+      {:ok, {:empty, _moves}} ->
         {:error, :empty_square}
 
-      piece ->
-        piece_color = if String.upcase(piece) == piece, do: :white, else: :black
+      {:ok, {piece_char, legal_moves}} when is_integer(piece_char) ->
+        # Uppercase = white (A-Z: 65-90), lowercase = black (a-z: 97-122)
+        piece_color = if piece_char >= ?A and piece_char <= ?Z, do: :white, else: :black
 
         if piece_color == player_color do
-          :ok
+          {:ok, legal_moves}
         else
           {:error, :opponent_piece}
         end
+
+      {:error, reason} ->
+        {:error, reason}
     end
-  end
-
-  # Parse FEN to get the piece at a specific square (e.g., "e2")
-  defp parse_square_piece(fen, square) do
-    <<file_char, rank_char>> = square
-    file = file_char - ?a  # 0-7 (a-h)
-    rank = 8 - (rank_char - ?0)  # 0-7 (rank 8 is index 0)
-
-    ranks = String.split(fen, "/")
-
-    if rank >= 0 and rank < length(ranks) do
-      rank_string = Enum.at(ranks, rank)
-      parse_file_in_rank(rank_string, file)
-    else
-      nil
-    end
-  end
-
-  # Parse a rank string to get the piece at a specific file index
-  defp parse_file_in_rank(rank_string, target_file) do
-    rank_string
-    |> String.graphemes()
-    |> Enum.reduce_while({0, nil}, fn char, {current_file, _} ->
-      case Integer.parse(char) do
-        {num, ""} ->
-          # Empty squares - advance file index
-          new_file = current_file + num
-
-          if target_file < new_file do
-            # Target is in the empty squares
-            {:halt, {current_file, nil}}
-          else
-            {:cont, {new_file, nil}}
-          end
-
-        :error ->
-          # It's a piece character
-          if current_file == target_file do
-            {:halt, {current_file, char}}
-          else
-            {:cont, {current_file + 1, nil}}
-          end
-      end
-    end)
-    |> elem(1)
   end
 
   defp end_game(state, result, reason, details) do

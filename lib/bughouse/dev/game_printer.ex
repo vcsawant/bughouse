@@ -140,7 +140,7 @@ defmodule Bughouse.Dev.GamePrinter do
   @doc """
   Prints move history.
   """
-  def print_move_history(game_server_pid, limit \\ 10) do
+  def print_move_history(game_server_pid, _limit \\ 10) do
     {:ok, state} = Bughouse.Games.BughouseGameServer.get_state(game_server_pid)
 
     if state.last_move do
