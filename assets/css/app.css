@@ -220,12 +220,36 @@
 }
 
 /* Drag-and-drop visual feedback */
+
+/* Piece being dragged - fade it to show it's picked up */
+.chess-piece.is-being-dragged {
+  opacity: 0.2 !important;
+  transition: opacity 0.1s ease;
+}
+
+/* Square being dragged OVER - highlight as potential drop target */
 [data-square].drag-over {
   @apply ring-2 ring-inset ring-blue-400;
 }
 
+/* Smooth transitions for piece opacity changes */
 .chess-piece {
   transition: opacity 0.15s ease;
+}
+
+/* Promotion selector styling */
+.promotion-selector {
+  opacity: 0.95;
+  backdrop-filter: blur(2px);
+}
+
+.promotion-selector button {
+  opacity: 0.9;
+}
+
+.promotion-selector button:hover {
+  opacity: 1;
+  transform: scale(1.05);
 }
 
 /* This file is for your main application CSS */

@@ -76,7 +76,10 @@ defmodule BughouseWeb.GameLive do
          |> assign(:selected_reserve_piece, nil)
          |> assign(:highlighted_squares, [])
          |> assign(:hovered_square, nil)
-         |> assign(:hover_highlighted_squares, [])}
+         |> assign(:hover_highlighted_squares, [])
+         |> assign(:promotion_square, nil)
+         |> assign(:promotion_from, nil)
+         |> assign(:legal_moves, [])}
     end
   end
 
@@ -123,8 +126,13 @@ defmodule BughouseWeb.GameLive do
                     {_from, to, _promo} -> to
                   end)
 
+                # Store the full move list to check for promotions later
                 {:noreply,
-                 assign(socket, selected_square: square, highlighted_squares: highlighted)}
+                 assign(socket,
+                   selected_square: square,
+                   highlighted_squares: highlighted,
+                   legal_moves: legal_moves
+                 )}
 
               {:error, _reason} ->
                 # Invalid selection (empty square, opponent's piece, or not player's turn)
@@ -161,7 +169,10 @@ defmodule BughouseWeb.GameLive do
      assign(socket,
        selected_square: nil,
        selected_reserve_piece: nil,
-       highlighted_squares: []
+       highlighted_squares: [],
+       legal_moves: [],
+       promotion_square: nil,
+       promotion_from: nil
      )}
   end
 
@@ -205,6 +216,51 @@ defmodule BughouseWeb.GameLive do
   end
 
   @impl true
+  def handle_event("select_promotion_piece", %{"piece" => piece}, socket) do
+    # Execute the promotion move
+    from = socket.assigns.promotion_from
+    to = socket.assigns.promotion_square
+    player_id = socket.assigns.current_player.id
+
+    # Move notation with promotion piece: e.g., "e7e8q"
+    move_notation = from <> to <> piece
+
+    case Games.make_game_move(socket.assigns.game.id, player_id, move_notation) do
+      :ok ->
+        {:noreply,
+         assign(socket,
+           selected_square: nil,
+           selected_reserve_piece: nil,
+           highlighted_squares: [],
+           legal_moves: [],
+           promotion_square: nil,
+           promotion_from: nil
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Invalid promotion: #{inspect(reason)}")
+         |> assign(
+           promotion_square: nil,
+           promotion_from: nil,
+           selected_square: nil,
+           highlighted_squares: [],
+           legal_moves: []
+         )}
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_promotion", _params, socket) do
+    {:noreply,
+     assign(socket,
+       promotion_square: nil,
+       promotion_from: nil
+     )}
+  end
+
+  @impl true
   def handle_info({:game_state_update, new_state}, socket) do
     {:noreply, assign(socket, game_state: new_state)}
   end
@@ -219,25 +275,43 @@ defmodule BughouseWeb.GameLive do
   defp handle_move_attempt(socket, from, to) do
     # Deselect if clicking the same square
     if from == to do
-      {:noreply, assign(socket, selected_square: nil, highlighted_squares: [])}
+      {:noreply, assign(socket, selected_square: nil, highlighted_squares: [], legal_moves: [])}
     else
-      player_id = socket.assigns.current_player.id
-      move_notation = from <> to
+      # Check if this is a promotion move
+      is_promotion =
+        Enum.any?(socket.assigns.legal_moves, fn
+          {^from, ^to, _promo} -> true
+          _ -> false
+        end)
 
-      case Games.make_game_move(socket.assigns.game.id, player_id, move_notation) do
-        :ok ->
-          {:noreply,
-           assign(socket,
-             selected_square: nil,
-             selected_reserve_piece: nil,
-             highlighted_squares: []
-           )}
+      if is_promotion do
+        # Show promotion selector instead of making the move
+        {:noreply,
+         assign(socket,
+           promotion_square: to,
+           promotion_from: from
+         )}
+      else
+        # Regular move - execute immediately
+        player_id = socket.assigns.current_player.id
+        move_notation = from <> to
 
-        {:error, reason} ->
-          {:noreply,
-           socket
-           |> put_flash(:error, "Invalid move: #{inspect(reason)}")
-           |> assign(selected_square: nil, highlighted_squares: [])}
+        case Games.make_game_move(socket.assigns.game.id, player_id, move_notation) do
+          :ok ->
+            {:noreply,
+             assign(socket,
+               selected_square: nil,
+               selected_reserve_piece: nil,
+               highlighted_squares: [],
+               legal_moves: []
+             )}
+
+          {:error, reason} ->
+            {:noreply,
+             socket
+             |> put_flash(:error, "Invalid move: #{inspect(reason)}")
+             |> assign(selected_square: nil, highlighted_squares: [], legal_moves: [])}
+        end
       end
     end
   end
@@ -371,6 +445,7 @@ defmodule BughouseWeb.GameLive do
           highlighted_squares={@highlighted_squares}
           hovered_square={@hovered_square}
           hover_highlighted_squares={@hover_highlighted_squares}
+          promotion_square={@promotion_square}
         />
         <.interactive_chess_board
           board_num={2}
@@ -382,6 +457,7 @@ defmodule BughouseWeb.GameLive do
           highlighted_squares={@highlighted_squares}
           hovered_square={@hovered_square}
           hover_highlighted_squares={@hover_highlighted_squares}
+          promotion_square={@promotion_square}
         />
       </div>
       

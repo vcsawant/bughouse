@@ -190,12 +190,25 @@ const ChessPieceHover = {
 // Chess piece drag-and-drop hook
 const ChessPieceDrag = {
   mounted() {
+    this.draggedSquare = null
+    this.draggedPiece = null
     this.setupDragAndDrop()
+  },
+
+  updated() {
+    // Re-apply dragging state if still in drag
+    // This handles LiveView re-renders that replace DOM elements
+    if (this.draggedSquare) {
+      const currentPiece = this.el.querySelector(`[data-square="${this.draggedSquare}"] .chess-piece`)
+      if (currentPiece) {
+        currentPiece.classList.add('is-being-dragged')
+        this.draggedPiece = currentPiece // Update reference to new DOM element
+      }
+    }
   },
 
   setupDragAndDrop() {
     const boardElement = this.el
-    let draggedSquare = null
 
     // Handle drag start on pieces
     boardElement.addEventListener("dragstart", (e) => {
@@ -205,17 +218,36 @@ const ChessPieceDrag = {
         const board = boardElement.dataset.board
 
         console.log("[Drag] Starting drag from square:", square, "on board:", board)
-        draggedSquare = square
+        this.draggedSquare = square
+        this.draggedPiece = e.target
 
         // Select the piece (triggers server validation and highlighting)
         this.pushEvent("select_square", { square, board })
 
-        // Visual feedback
+        // Visual feedback - hide the original piece to simulate picking it up
         e.dataTransfer.effectAllowed = "move"
         e.dataTransfer.setData("text/plain", square)
 
-        // Make the drag ghost semi-transparent
-        e.target.style.opacity = "0.5"
+        // Create a custom drag image for better visual feedback
+        // Clone the piece to use as drag image
+        const dragImage = e.target.cloneNode(true)
+        dragImage.style.position = 'absolute'
+        dragImage.style.top = '-1000px' // Move offscreen
+        dragImage.style.opacity = '0.9'
+        dragImage.classList.remove('is-being-dragged') // Don't fade the drag image
+        document.body.appendChild(dragImage)
+
+        // Set the custom drag image (offset to center of cursor)
+        e.dataTransfer.setDragImage(dragImage, 25, 25)
+
+        // Clean up the temporary drag image after a short delay
+        setTimeout(() => document.body.removeChild(dragImage), 0)
+
+        // Hide the original piece using CSS class (survives LiveView re-renders)
+        // Use setTimeout to avoid affecting the drag image
+        setTimeout(() => {
+          e.target.classList.add('is-being-dragged')
+        }, 0)
       } else {
         console.log("[Drag] Drag started but target is not a chess-piece:", e.target)
       }
@@ -224,14 +256,22 @@ const ChessPieceDrag = {
     // Handle drag end (cleanup)
     boardElement.addEventListener("dragend", (e) => {
       if (e.target.classList.contains("chess-piece")) {
-        e.target.style.opacity = "1"
-        draggedSquare = null
+        // Remove the dragging class
+        e.target.classList.remove('is-being-dragged')
+
+        // Also remove from the tracked piece if it's different (due to LiveView re-render)
+        if (this.draggedPiece && this.draggedPiece !== e.target) {
+          this.draggedPiece.classList.remove('is-being-dragged')
+        }
+
+        this.draggedSquare = null
+        this.draggedPiece = null
       }
     })
 
     // Handle drag over (allow drop on valid squares)
     boardElement.addEventListener("dragover", (e) => {
-      if (draggedSquare) {
+      if (this.draggedSquare) {
         e.preventDefault() // Allow drop
         e.dataTransfer.dropEffect = "move"
       }
@@ -241,7 +281,7 @@ const ChessPieceDrag = {
     boardElement.addEventListener("drop", (e) => {
       e.preventDefault()
 
-      if (!draggedSquare) {
+      if (!this.draggedSquare) {
         console.log("[Drag] Drop event but no draggedSquare set")
         return
       }
@@ -252,10 +292,10 @@ const ChessPieceDrag = {
         const toSquare = dropTarget.dataset.square
         const board = boardElement.dataset.board
 
-        console.log("[Drag] Dropped on square:", toSquare, "from:", draggedSquare)
+        console.log("[Drag] Dropped on square:", toSquare, "from:", this.draggedSquare)
 
         // If dropping on the same square, just deselect
-        if (toSquare === draggedSquare) {
+        if (toSquare === this.draggedSquare) {
           console.log("[Drag] Same square, deselecting")
           this.pushEvent("deselect_all", {})
         } else {
@@ -268,13 +308,13 @@ const ChessPieceDrag = {
         console.log("[Drag] No drop target found")
       }
 
-      draggedSquare = null
+      // Clean up - dragend will also fire and handle cleanup
     })
 
     // Visual feedback on drag enter/leave
     boardElement.addEventListener("dragenter", (e) => {
       const target = e.target.closest('[data-square]')
-      if (target && draggedSquare) {
+      if (target && this.draggedSquare && target.dataset.square !== this.draggedSquare) {
         target.classList.add("drag-over")
       }
     })

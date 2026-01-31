@@ -555,6 +555,7 @@ defmodule BughouseWeb.ChessComponents do
   attr :highlighted_squares, :list, default: []
   attr :hovered_square, :string, default: nil
   attr :hover_highlighted_squares, :list, default: []
+  attr :promotion_square, :string, default: nil
 
   def interactive_chess_board(assigns) do
     # Parse FEN and render board with click handlers
@@ -576,6 +577,14 @@ defmodule BughouseWeb.ChessComponents do
         board
       end
 
+    # Calculate promotion square position if there is one
+    promotion_position =
+      if assigns.promotion_square do
+        calculate_square_position(assigns.promotion_square, assigns.flip)
+      else
+        nil
+      end
+
     assigns =
       assigns
       |> assign(:board, display_board)
@@ -583,6 +592,8 @@ defmodule BughouseWeb.ChessComponents do
       |> assign(:is_my_board, is_my_board)
       |> assign(:hovered_square, Map.get(assigns, :hovered_square))
       |> assign(:hover_highlighted_squares, Map.get(assigns, :hover_highlighted_squares, []))
+      |> assign(:promotion_square, Map.get(assigns, :promotion_square))
+      |> assign(:promotion_position, promotion_position)
 
     ~H"""
     <div
@@ -592,7 +603,7 @@ defmodule BughouseWeb.ChessComponents do
       data-board={@board_num}
     >
       <div class={[
-        "grid grid-cols-8 gap-0 shadow-lg",
+        "grid grid-cols-8 gap-0 shadow-lg relative",
         "border-[0.25rem] rounded-sm",
         @size_class,
         "border-[var(--chess-board-border,oklch(40%_0.06_62))]"
@@ -625,10 +636,20 @@ defmodule BughouseWeb.ChessComponents do
             # Only show drop targets on player's own board
             has_drop_target = @selected_reserve_piece != nil && @is_my_board
             # NEW: Hover state (softer visual)
-            is_hovered = @hovered_square == square_notation && @is_my_board
             is_hover_highlighted = square_notation in @hover_highlighted_squares && @is_my_board
             # Only show hover highlights when nothing is selected
-            show_hover = is_hover_highlighted && @selected_square == nil %>
+            show_hover = is_hover_highlighted && @selected_square == nil
+
+            # Check if this piece belongs to the current player (for draggability)
+            # White pieces are uppercase, black pieces are lowercase
+            piece_is_mine =
+              if piece && @is_my_board do
+                player_color = get_position_color(@my_position)
+                piece_color = if String.upcase(piece) == piece, do: :white, else: :black
+                player_color == piece_color
+              else
+                false
+              end %>
             <div
               class={
                 [
@@ -661,9 +682,9 @@ defmodule BughouseWeb.ChessComponents do
                     "chess-piece",
                     piece_color_class,
                     "text-[2.5rem] leading-none",
-                    @is_my_board && "cursor-grab active:cursor-grabbing"
+                    piece_is_mine && "cursor-grab active:cursor-grabbing"
                   ]}
-                  draggable={if @is_my_board, do: "true", else: "false"}
+                  draggable={if piece_is_mine, do: "true", else: "false"}
                   data-square={square_notation}
                 >
                   {piece_to_unicode(piece)}
@@ -686,7 +707,95 @@ defmodule BughouseWeb.ChessComponents do
             </div>
           <% end %>
         <% end %>
+        
+    <!-- Promotion selector overlay (positioned absolutely over the board grid) -->
+        <%= if @promotion_square && @promotion_position && @is_my_board do %>
+          <% player_color = get_position_color(@my_position) %>
+          <.promotion_selector_positioned
+            color={player_color}
+            position={@promotion_position}
+            square={@promotion_square}
+          />
+        <% end %>
       </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Promotion piece selector - 2x2 grid of pieces to choose from.
+
+  Shows knight, bishop, rook, queen in a 2x2 grid positioned absolutely over the board.
+
+  ## Attributes
+
+    * `color` - The color of the promoting pawn (:white or :black)
+    * `position` - Map with :left and :top percentages for positioning
+    * `square` - Square notation for the promotion (for ID)
+  """
+  attr :color, :atom, required: true
+  attr :position, :map, required: true
+  attr :square, :string, required: true
+
+  def promotion_selector_positioned(assigns) do
+    # Determine which Unicode pieces to show based on color
+    pieces =
+      if assigns.color == :white do
+        %{n: "♘", b: "♗", r: "♖", q: "♕"}
+      else
+        %{n: "♞", b: "♝", r: "♜", q: "♛"}
+      end
+
+    assigns = assign(assigns, :pieces, pieces)
+
+    ~H"""
+    <!-- Promotion selector overlay - 2x2 grid centered around the promotion square -->
+    <div
+      id={"promotion-selector-#{@square}"}
+      class="absolute z-50 grid grid-cols-2 gap-0 shadow-2xl pointer-events-auto promotion-selector"
+      style={"left: #{@position.left}%; top: #{@position.top}%; width: 25%; height: 25%; transform: translate(-50%, -50%);"}
+      phx-click-away="cancel_promotion"
+    >
+      <!-- Knight (top-left) -->
+      <button
+        type="button"
+        class="bg-base-100 hover:bg-primary hover:text-primary-content flex items-center justify-center text-4xl transition-all border-2 border-base-300 chess-piece"
+        phx-click="select_promotion_piece"
+        phx-value-piece="n"
+        title="Promote to Knight"
+      >
+        {@pieces.n}
+      </button>
+      <!-- Bishop (top-right) -->
+      <button
+        type="button"
+        class="bg-base-100 hover:bg-primary hover:text-primary-content flex items-center justify-center text-4xl transition-all border-2 border-base-300 chess-piece"
+        phx-click="select_promotion_piece"
+        phx-value-piece="b"
+        title="Promote to Bishop"
+      >
+        {@pieces.b}
+      </button>
+      <!-- Rook (bottom-left) -->
+      <button
+        type="button"
+        class="bg-base-100 hover:bg-primary hover:text-primary-content flex items-center justify-center text-4xl transition-all border-2 border-base-300 chess-piece"
+        phx-click="select_promotion_piece"
+        phx-value-piece="r"
+        title="Promote to Rook"
+      >
+        {@pieces.r}
+      </button>
+      <!-- Queen (bottom-right) -->
+      <button
+        type="button"
+        class="bg-base-100 hover:bg-primary hover:text-primary-content flex items-center justify-center text-4xl transition-all border-2 border-base-300 chess-piece"
+        phx-click="select_promotion_piece"
+        phx-value-piece="q"
+        title="Promote to Queen"
+      >
+        {@pieces.q}
+      </button>
     </div>
     """
   end
@@ -815,6 +924,32 @@ defmodule BughouseWeb.ChessComponents do
     file = if flip, do: ?h - file_idx, else: ?a + file_idx
     rank = if flip, do: rank_idx + 1, else: 8 - rank_idx
     <<file, rank + ?0>>
+  end
+
+  # Calculate position (in percentages) for a square notation (e.g., "e8")
+  # Returns a map with :left and :top percentages for the CENTER of the square
+  # The promotion grid will be centered around this point using CSS transform
+  defp calculate_square_position(square_notation, flip) do
+    # Parse square notation: first char is file (a-h), second is rank (1-8)
+    <<file_char, rank_char>> = square_notation
+
+    # Convert to 0-based indices
+    # 0-7 (a=0, h=7)
+    file = file_char - ?a
+    # 0-7 (1=0, 8=7)
+    rank = rank_char - ?1
+
+    # Convert to display indices (accounting for flip)
+    # Rank is displayed from top to bottom: 8,7,6,5,4,3,2,1 (rank 7 is at top)
+    display_rank = if flip, do: rank, else: 7 - rank
+    display_file = if flip, do: 7 - file, else: file
+
+    # Each square is 12.5% of the board (100% / 8)
+    # Calculate the CENTER of the square (add half a square: 6.25%)
+    %{
+      left: display_file * 12.5 + 6.25,
+      top: display_rank * 12.5 + 6.25
+    }
   end
 
   # Convert piece type atom to Unicode symbol
