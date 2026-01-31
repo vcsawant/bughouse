@@ -219,4 +219,13 @@
   color: oklch(30% 0 0);
 }
 
+/* Drag-and-drop visual feedback */
+[data-square].drag-over {
+  @apply ring-2 ring-inset ring-blue-400;
+}
+
+.chess-piece {
+  transition: opacity 0.15s ease;
+}
+
 /* This file is for your main application CSS */

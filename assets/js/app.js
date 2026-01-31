@@ -165,13 +165,138 @@ const ChessClockCountdown = {
   }
 }
 
+// Chess piece hover preview hook
+const ChessPieceHover = {
+  mounted() {
+    const square = this.el.dataset.square
+    const board = this.el.dataset.board
+
+    // Show hover preview on mouseenter
+    this.el.addEventListener("mouseenter", (e) => {
+      // Only show hover if we're hovering over a piece
+      const hasPiece = this.el.querySelector(".chess-piece") !== null
+      if (hasPiece) {
+        this.pushEvent("hover_piece", { square, board })
+      }
+    })
+
+    // Clear hover preview on mouseleave
+    this.el.addEventListener("mouseleave", (e) => {
+      this.pushEvent("unhover_piece", {})
+    })
+  }
+}
+
+// Chess piece drag-and-drop hook
+const ChessPieceDrag = {
+  mounted() {
+    this.setupDragAndDrop()
+  },
+
+  setupDragAndDrop() {
+    const boardElement = this.el
+    let draggedSquare = null
+
+    // Handle drag start on pieces
+    boardElement.addEventListener("dragstart", (e) => {
+      // Check if we're dragging a piece (not the square itself)
+      if (e.target.classList.contains("chess-piece")) {
+        const square = e.target.dataset.square
+        const board = boardElement.dataset.board
+
+        console.log("[Drag] Starting drag from square:", square, "on board:", board)
+        draggedSquare = square
+
+        // Select the piece (triggers server validation and highlighting)
+        this.pushEvent("select_square", { square, board })
+
+        // Visual feedback
+        e.dataTransfer.effectAllowed = "move"
+        e.dataTransfer.setData("text/plain", square)
+
+        // Make the drag ghost semi-transparent
+        e.target.style.opacity = "0.5"
+      } else {
+        console.log("[Drag] Drag started but target is not a chess-piece:", e.target)
+      }
+    })
+
+    // Handle drag end (cleanup)
+    boardElement.addEventListener("dragend", (e) => {
+      if (e.target.classList.contains("chess-piece")) {
+        e.target.style.opacity = "1"
+        draggedSquare = null
+      }
+    })
+
+    // Handle drag over (allow drop on valid squares)
+    boardElement.addEventListener("dragover", (e) => {
+      if (draggedSquare) {
+        e.preventDefault() // Allow drop
+        e.dataTransfer.dropEffect = "move"
+      }
+    })
+
+    // Handle drop
+    boardElement.addEventListener("drop", (e) => {
+      e.preventDefault()
+
+      if (!draggedSquare) {
+        console.log("[Drag] Drop event but no draggedSquare set")
+        return
+      }
+
+      // Find the square we dropped on
+      const dropTarget = e.target.closest('[data-square]')
+      if (dropTarget) {
+        const toSquare = dropTarget.dataset.square
+        const board = boardElement.dataset.board
+
+        console.log("[Drag] Dropped on square:", toSquare, "from:", draggedSquare)
+
+        // If dropping on the same square, just deselect
+        if (toSquare === draggedSquare) {
+          console.log("[Drag] Same square, deselecting")
+          this.pushEvent("deselect_all", {})
+        } else {
+          console.log("[Drag] Different square, attempting move")
+          // Attempt the move (server will validate)
+          // The existing select_square handler will handle move logic
+          this.pushEvent("select_square", { square: toSquare, board })
+        }
+      } else {
+        console.log("[Drag] No drop target found")
+      }
+
+      draggedSquare = null
+    })
+
+    // Visual feedback on drag enter/leave
+    boardElement.addEventListener("dragenter", (e) => {
+      const target = e.target.closest('[data-square]')
+      if (target && draggedSquare) {
+        target.classList.add("drag-over")
+      }
+    })
+
+    boardElement.addEventListener("dragleave", (e) => {
+      const target = e.target.closest('[data-square]')
+      if (target) {
+        target.classList.remove("drag-over")
+      }
+    })
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
   hooks: {
     ...colocatedHooks,
-    ChessClockCountdown
+    ChessClockCountdown,
+    ChessPieceHover,
+    ChessPieceDrag
   },
 })
 

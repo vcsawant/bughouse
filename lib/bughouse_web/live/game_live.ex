@@ -74,7 +74,9 @@ defmodule BughouseWeb.GameLive do
          |> assign(:my_team, get_my_team(my_position))
          |> assign(:selected_square, nil)
          |> assign(:selected_reserve_piece, nil)
-         |> assign(:highlighted_squares, [])}
+         |> assign(:highlighted_squares, [])
+         |> assign(:hovered_square, nil)
+         |> assign(:hover_highlighted_squares, [])}
     end
   end
 
@@ -96,10 +98,16 @@ defmodule BughouseWeb.GameLive do
         # If a reserve piece is selected, this is a drop attempt
         if socket.assigns.selected_reserve_piece do
           handle_drop_attempt(socket, socket.assigns.selected_reserve_piece, square)
-        # If a square is already selected, this is a move attempt
+          # If a square is already selected, this is a move attempt
         else
           if socket.assigns.selected_square do
-            handle_move_attempt(socket, socket.assigns.selected_square, square)
+            # Check if clicking a highlighted square (valid move)
+            if square in socket.assigns.highlighted_squares do
+              handle_move_attempt(socket, socket.assigns.selected_square, square)
+            else
+              # Clicking a non-valid square deselects
+              {:noreply, assign(socket, selected_square: nil, highlighted_squares: [])}
+            end
           else
             # Validate piece selection with game server
             player_id = socket.assigns.current_player.id
@@ -109,12 +117,14 @@ defmodule BughouseWeb.GameLive do
                 # Valid piece - select it and highlight legal move destinations
                 # Extract destination squares from move tuples
                 # Moves are either {from, to} or {from, to, promo}
-                highlighted = Enum.map(legal_moves, fn
-                  {_from, to} -> to
-                  {_from, to, _promo} -> to
-                end)
+                highlighted =
+                  Enum.map(legal_moves, fn
+                    {_from, to} -> to
+                    {_from, to, _promo} -> to
+                  end)
 
-                {:noreply, assign(socket, selected_square: square, highlighted_squares: highlighted)}
+                {:noreply,
+                 assign(socket, selected_square: square, highlighted_squares: highlighted)}
 
               {:error, _reason} ->
                 # Invalid selection (empty square, opponent's piece, or not player's turn)
@@ -153,6 +163,45 @@ defmodule BughouseWeb.GameLive do
        selected_reserve_piece: nil,
        highlighted_squares: []
      )}
+  end
+
+  @impl true
+  def handle_event("hover_piece", %{"square" => square, "board" => board_str}, socket) do
+    # Don't show hover highlights if a piece is already selected
+    if socket.assigns.selected_square != nil do
+      {:noreply, socket}
+    else
+      board_num = String.to_integer(board_str)
+      my_position = socket.assigns.my_position
+
+      # Only show hover on player's own board
+      if my_position == nil or board_num != get_position_board(my_position) do
+        {:noreply, socket}
+      else
+        player_id = socket.assigns.current_player.id
+
+        case Games.can_select_piece?(socket.assigns.game.id, player_id, square) do
+          {:ok, legal_moves} ->
+            hover_highlighted =
+              Enum.map(legal_moves, fn
+                {_from, to} -> to
+                {_from, to, _promo} -> to
+              end)
+
+            {:noreply,
+             assign(socket, hovered_square: square, hover_highlighted_squares: hover_highlighted)}
+
+          {:error, _reason} ->
+            # Not a valid piece to hover (empty, opponent's piece, not turn)
+            {:noreply, assign(socket, hovered_square: nil, hover_highlighted_squares: [])}
+        end
+      end
+    end
+  end
+
+  @impl true
+  def handle_event("unhover_piece", _params, socket) do
+    {:noreply, assign(socket, hovered_square: nil, hover_highlighted_squares: [])}
   end
 
   @impl true
@@ -267,8 +316,7 @@ defmodule BughouseWeb.GameLive do
       <%= if Application.get_env(:bughouse, :env) == :dev do %>
         <div class="alert alert-info mb-4 text-xs font-mono">
           <div>
-            <strong>Debug:</strong>
-            Player ID: {@current_player.id} |
+            <strong>Debug:</strong> Player ID: {@current_player.id} |
             Name: {@current_player.display_name} |
             Position: {inspect(@my_position)} |
             Team: {inspect(@my_team)}
@@ -290,8 +338,8 @@ defmodule BughouseWeb.GameLive do
           is_active={:board_2_white in @game_state.active_clocks}
         />
       </div>
-
-      <!-- Team 2 Clocks and Reserves (Above boards) -->
+      
+    <!-- Team 2 Clocks and Reserves (Above boards) -->
       <div class="grid grid-cols-2 gap-8 mb-4">
         <.clock_and_reserves
           position={:board_1_black}
@@ -310,8 +358,8 @@ defmodule BughouseWeb.GameLive do
           selected_piece={@selected_reserve_piece}
         />
       </div>
-
-      <!-- Two Boards -->
+      
+    <!-- Two Boards -->
       <div class="grid grid-cols-2 gap-8 mb-4">
         <.interactive_chess_board
           board_num={1}
@@ -321,6 +369,8 @@ defmodule BughouseWeb.GameLive do
           selected_square={@selected_square}
           selected_reserve_piece={@selected_reserve_piece}
           highlighted_squares={@highlighted_squares}
+          hovered_square={@hovered_square}
+          hover_highlighted_squares={@hover_highlighted_squares}
         />
         <.interactive_chess_board
           board_num={2}
@@ -330,10 +380,12 @@ defmodule BughouseWeb.GameLive do
           selected_square={@selected_square}
           selected_reserve_piece={@selected_reserve_piece}
           highlighted_squares={@highlighted_squares}
+          hovered_square={@hovered_square}
+          hover_highlighted_squares={@hover_highlighted_squares}
         />
       </div>
-
-      <!-- Team 1 Clocks and Reserves (Below boards) -->
+      
+    <!-- Team 1 Clocks and Reserves (Below boards) -->
       <div class="grid grid-cols-2 gap-8 mb-4">
         <.clock_and_reserves
           position={:board_1_white}
@@ -352,8 +404,8 @@ defmodule BughouseWeb.GameLive do
           selected_piece={@selected_reserve_piece}
         />
       </div>
-
-      <!-- Team 1 Header (Bottom) -->
+      
+    <!-- Team 1 Header (Bottom) -->
       <div class="grid grid-cols-2 gap-8 mb-4">
         <.player_header
           position={:board_1_white}
@@ -368,8 +420,8 @@ defmodule BughouseWeb.GameLive do
           is_active={:board_2_black in @game_state.active_clocks}
         />
       </div>
-
-      <!-- Deselect button (only visible when something is selected) -->
+      
+    <!-- Deselect button (only visible when something is selected) -->
       <%= if @selected_square || @selected_reserve_piece do %>
         <div class="fixed bottom-8 right-8 z-10">
           <button
@@ -381,8 +433,8 @@ defmodule BughouseWeb.GameLive do
           </button>
         </div>
       <% end %>
-
-      <!-- Game Over Modal -->
+      
+    <!-- Game Over Modal -->
       <%= if @game_state.result do %>
         <.game_result_modal
           result={@game_state.result}

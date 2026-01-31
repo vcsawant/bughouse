@@ -304,8 +304,8 @@ defmodule BughouseWeb.ChessComponents do
             <span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
           </span>
         <% end %>
-
-        <!-- DaisyUI Countdown Component (MM:SS format) -->
+        
+    <!-- DaisyUI Countdown Component (MM:SS format) -->
         <div class="grid grid-flow-col gap-1 text-center auto-cols-max">
           <!-- Minutes -->
           <div class="flex flex-col">
@@ -473,8 +473,8 @@ defmodule BughouseWeb.ChessComponents do
           color={get_position_color(@position)}
         />
       </div>
-
-      <!-- Reserve Pieces (right-aligned) -->
+      
+    <!-- Reserve Pieces (right-aligned) -->
       <div class="flex-1 flex justify-end">
         <.reserve_pieces
           pieces={@reserves}
@@ -553,6 +553,8 @@ defmodule BughouseWeb.ChessComponents do
   attr :selected_square, :string, default: nil
   attr :selected_reserve_piece, :atom, default: nil
   attr :highlighted_squares, :list, default: []
+  attr :hovered_square, :string, default: nil
+  attr :hover_highlighted_squares, :list, default: []
 
   def interactive_chess_board(assigns) do
     # Parse FEN and render board with click handlers
@@ -579,9 +581,16 @@ defmodule BughouseWeb.ChessComponents do
       |> assign(:board, display_board)
       |> assign(:size_class, size_class)
       |> assign(:is_my_board, is_my_board)
+      |> assign(:hovered_square, Map.get(assigns, :hovered_square))
+      |> assign(:hover_highlighted_squares, Map.get(assigns, :hover_highlighted_squares, []))
 
     ~H"""
-    <div class="relative inline-block">
+    <div
+      class="relative inline-block"
+      phx-hook="ChessPieceDrag"
+      id={"chess-board-#{@board_num}"}
+      data-board={@board_num}
+    >
       <div class={[
         "grid grid-cols-8 gap-0 shadow-lg",
         "border-[0.25rem] rounded-sm",
@@ -614,33 +623,54 @@ defmodule BughouseWeb.ChessComponents do
             is_selected = @selected_square == square_notation && @is_my_board
             is_highlighted = square_notation in @highlighted_squares && @is_my_board
             # Only show drop targets on player's own board
-            has_drop_target = @selected_reserve_piece != nil && @is_my_board %>
+            has_drop_target = @selected_reserve_piece != nil && @is_my_board
+            # NEW: Hover state (softer visual)
+            is_hovered = @hovered_square == square_notation && @is_my_board
+            is_hover_highlighted = square_notation in @hover_highlighted_squares && @is_my_board
+            # Only show hover highlights when nothing is selected
+            show_hover = is_hover_highlighted && @selected_square == nil %>
             <div
-              class={[
-                "aspect-square flex items-center justify-center relative overflow-hidden",
-                "select-none cursor-pointer",
-                "transition-colors duration-150",
-                "hover:brightness-95",
-                square_color,
-                is_selected && "ring-4 ring-inset ring-blue-500",
-                is_highlighted && "bg-green-400 bg-opacity-50",
-                has_drop_target && piece == nil && "bg-yellow-300 bg-opacity-30"
-              ]}
+              class={
+                [
+                  "aspect-square flex items-center justify-center relative overflow-hidden",
+                  "select-none cursor-pointer",
+                  "transition-colors duration-150",
+                  square_color,
+                  # Selected state (full highlight)
+                  is_selected && "ring-4 ring-inset ring-blue-500",
+                  is_highlighted && "bg-green-400 bg-opacity-50",
+                  # Hover state (soft highlight) - only when nothing selected
+                  show_hover && "bg-green-300 bg-opacity-30",
+                  # Drop target for reserve pieces
+                  has_drop_target && piece == nil && "bg-yellow-300 bg-opacity-30",
+                  # Hover effect on piece squares
+                  piece != nil && !is_selected && "hover:brightness-95"
+                ]
+              }
               phx-click="select_square"
               phx-value-square={square_notation}
               phx-value-board={@board_num}
+              phx-hook={piece != nil && @is_my_board && "ChessPieceHover"}
+              id={"square-#{@board_num}-#{square_notation}"}
+              data-square={square_notation}
+              data-board={@board_num}
             >
               <%= if piece do %>
-                <span class={[
-                  "chess-piece",
-                  piece_color_class,
-                  "text-[2.5rem] leading-none"
-                ]}>
+                <span
+                  class={[
+                    "chess-piece",
+                    piece_color_class,
+                    "text-[2.5rem] leading-none",
+                    @is_my_board && "cursor-grab active:cursor-grabbing"
+                  ]}
+                  draggable={if @is_my_board, do: "true", else: "false"}
+                  data-square={square_notation}
+                >
                   {piece_to_unicode(piece)}
                 </span>
               <% end %>
-
-              <!-- Show rank/file coordinates -->
+              
+    <!-- Show rank/file coordinates -->
               <%= if file_idx == 0 do %>
                 <% rank_number = if @flip, do: rank_idx + 1, else: 8 - rank_idx %>
                 <span class="absolute bottom-0.5 left-0.5 text-[0.6rem] opacity-60 font-semibold pointer-events-none">
@@ -691,12 +721,15 @@ defmodule BughouseWeb.ChessComponents do
       "text-center p-3 rounded-lg transition-all",
       @is_me && "bg-primary bg-opacity-20 ring-2 ring-primary"
     ]}>
-      <div class={["font-semibold text-lg flex items-center justify-center gap-2", @is_me && "text-primary"]}>
+      <div class={[
+        "font-semibold text-lg flex items-center justify-center gap-2",
+        @is_me && "text-primary"
+      ]}>
         <%= if @is_active do %>
           <span class="text-success text-2xl" title="Active turn">▶</span>
         <% end %>
         <span>
-          {@player_name} <%= if @is_me, do: "(You)" %>
+          {@player_name} {if @is_me, do: "(You)"}
         </span>
       </div>
       <div class="text-sm opacity-70 capitalize">
@@ -768,6 +801,7 @@ defmodule BughouseWeb.ChessComponents do
 
   # Check if a board number matches the player's position
   defp is_players_board?(nil, _board_num), do: false
+
   defp is_players_board?(position, board_num) do
     get_position_board(position) == board_num
   end

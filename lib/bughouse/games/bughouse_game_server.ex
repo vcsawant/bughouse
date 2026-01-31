@@ -368,22 +368,23 @@ defmodule Bughouse.Games.BughouseGameServer do
       # Check if player is in the game
       if position == nil do
         {:reply, {:error, :not_in_game}, state}
-      # Check if it's the player's turn
-      else if not MapSet.member?(state.active_clocks, position) do
-        {:reply, {:error, :not_your_turn}, state}
+        # Check if it's the player's turn
       else
-        # Get the board and check if there's a valid piece at the square
-        {_board_num, board_pid} = get_board_for_position(state, position)
-        player_color = position_to_color(position)
+        if not MapSet.member?(state.active_clocks, position) do
+          {:reply, {:error, :not_your_turn}, state}
+        else
+          # Get the board and check if there's a valid piece at the square
+          {_board_num, board_pid} = get_board_for_position(state, position)
+          player_color = position_to_color(position)
 
-        case get_piece_at_square(board_pid, square, player_color) do
-          {:ok, legal_moves} ->
-            {:reply, {:ok, legal_moves}, state}
+          case get_piece_at_square(board_pid, square, player_color) do
+            {:ok, legal_moves} ->
+              {:reply, {:ok, legal_moves}, state}
 
-          {:error, reason} ->
-            {:reply, {:error, reason}, state}
+            {:error, reason} ->
+              {:reply, {:error, reason}, state}
+          end
         end
-      end
       end
     end
   end

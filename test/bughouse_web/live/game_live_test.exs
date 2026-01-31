@@ -152,8 +152,10 @@ defmodule BughouseWeb.GameLiveTest do
       {:ok, _view, html} = live(conn, ~p"/game/#{game.invite_code}")
 
       # Check that reserve piece buttons are present
-      assert html =~ "♙"  # Pawn Unicode character
-      assert html =~ "♘"  # Knight Unicode character
+      # Pawn Unicode character
+      assert html =~ "♙"
+      # Knight Unicode character
+      assert html =~ "♘"
     end
   end
 

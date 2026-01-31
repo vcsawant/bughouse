@@ -36,12 +36,14 @@ defmodule BughouseWeb.UserAuth do
 
           case Accounts.get_player(player_id) do
             nil ->
-              Logger.warning(
-                "Session player_id #{player_id} not found in DB, creating new guest"
-              )
+              Logger.warning("Session player_id #{player_id} not found in DB, creating new guest")
 
               {:ok, player} = Accounts.create_guest_player()
-              Logger.info("Created replacement guest player: #{player.id} (#{player.display_name})")
+
+              Logger.info(
+                "Created replacement guest player: #{player.id} (#{player.display_name})"
+              )
+
               player
 
             player ->
