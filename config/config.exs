@@ -11,6 +11,15 @@ config :bughouse,
   ecto_repos: [Bughouse.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+# OAuth configuration
+config :bughouse, :oauth,
+  google: [
+    client_id: System.get_env("GOOGLE_CLIENT_ID"),
+    client_secret: System.get_env("GOOGLE_CLIENT_SECRET"),
+    redirect_uri:
+      System.get_env("GOOGLE_REDIRECT_URI") || "http://localhost:4000/auth/google/callback"
+  ]
+
 # Configure the endpoint
 config :bughouse, BughouseWeb.Endpoint,
   url: [host: "localhost"],

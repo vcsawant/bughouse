@@ -92,4 +92,49 @@ defmodule BughouseWeb.Layouts do
     </div>
     """
   end
+
+  @doc """
+  User menu component showing login/account status.
+  """
+  attr :current_player, :map, required: true
+
+  def user_menu(assigns) do
+    ~H"""
+    <div class="dropdown dropdown-end">
+      <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
+        <div class="w-10 rounded-full flex items-center justify-center">
+          <.icon name="hero-user-circle" class="size-8" />
+        </div>
+      </div>
+      <ul
+        tabindex="0"
+        class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-200 rounded-box w-52"
+      >
+        <%= if @current_player.guest do %>
+          <li class="menu-title">
+            <span>{@current_player.display_name}</span>
+          </li>
+          <li>
+            <a href={~p"/login"}>
+              <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Sign In
+            </a>
+          </li>
+        <% else %>
+          <li class="menu-title">
+            <span>{@current_player.display_name}</span>
+          </li>
+          <li class="text-xs opacity-70 px-4 py-1">
+            Rating: {@current_player.current_rating}
+          </li>
+          <div class="divider my-0"></div>
+          <li>
+            <a href={~p"/logout"}>
+              <.icon name="hero-arrow-left-on-rectangle" class="size-4" /> Sign Out
+            </a>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+    """
+  end
 end

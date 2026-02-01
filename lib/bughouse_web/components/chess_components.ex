@@ -858,10 +858,18 @@ defmodule BughouseWeb.ChessComponents do
     * `result` - Result atom (:team_1, :team_2, or :draw)
     * `result_reason` - Human-readable reason string
     * `my_team` - Current player's team (for personalized messaging)
+    * `team_1_white` - Display name of team 1's white player
+    * `team_1_black` - Display name of team 1's black player
+    * `team_2_white` - Display name of team 2's white player
+    * `team_2_black` - Display name of team 2's black player
   """
   attr :result, :atom, required: true
   attr :result_reason, :string, required: true
   attr :my_team, :atom, default: nil
+  attr :team_1_white, :string, default: nil
+  attr :team_1_black, :string, default: nil
+  attr :team_2_white, :string, default: nil
+  attr :team_2_black, :string, default: nil
 
   def game_result_modal(assigns) do
     assigns = assign(assigns, :is_winner, assigns.result == assigns.my_team)
@@ -882,7 +890,14 @@ defmodule BughouseWeb.ChessComponents do
         </h3>
 
         <p class="text-xl mb-6">
-          {format_result_message(@result, @result_reason)}
+          {format_result_message(
+            @result,
+            @result_reason,
+            @team_1_white,
+            @team_1_black,
+            @team_2_white,
+            @team_2_black
+          )}
         </p>
 
         <div class="modal-action justify-center">
@@ -915,9 +930,43 @@ defmodule BughouseWeb.ChessComponents do
     get_position_board(position) == board_num
   end
 
-  defp format_result_message(:team_1, reason), do: "Team 1 wins! #{reason}"
-  defp format_result_message(:team_2, reason), do: "Team 2 wins! #{reason}"
-  defp format_result_message(:draw, reason), do: "Game drawn. #{reason}"
+  defp format_result_message(:team_1, reason, white, black, _, _) do
+    format_win_message(white, black, reason)
+  end
+
+  defp format_result_message(:team_2, reason, _, _, white, black) do
+    format_win_message(white, black, reason)
+  end
+
+  defp format_result_message(:draw, reason, _, _, _, _) do
+    format_draw_message(reason)
+  end
+
+  defp format_win_message(player1, player2, reason) do
+    names = format_player_names(player1, player2)
+    reason_text = format_reason(reason)
+    "#{names} win by #{reason_text}!"
+  end
+
+  defp format_draw_message(reason) do
+    reason_text = format_reason(reason)
+    "Game drawn by #{reason_text}."
+  end
+
+  defp format_player_names(nil, nil), do: "Team"
+  defp format_player_names(p1, nil), do: p1
+  defp format_player_names(nil, p2), do: p2
+  defp format_player_names(p1, p2), do: "#{p1} and #{p2}"
+
+  defp format_reason("king_captured"), do: "king capture"
+  defp format_reason("timeout"), do: "timeout"
+  defp format_reason("checkmate"), do: "checkmate"
+  defp format_reason("resignation"), do: "resignation"
+  defp format_reason("stalemate"), do: "stalemate"
+  defp format_reason("threefold_repetition"), do: "threefold repetition"
+  defp format_reason("fifty_move_rule"), do: "fifty-move rule"
+  defp format_reason("insufficient_material"), do: "insufficient material"
+  defp format_reason(reason), do: reason
 
   # Convert square indices to chess notation (e.g., "e2")
   defp square_to_notation(file_idx, rank_idx, flip) do

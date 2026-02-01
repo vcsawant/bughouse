@@ -16,45 +16,72 @@ defmodule BughouseWeb.UserAuth do
   def init(opts), do: opts
 
   @doc """
-  Plug that ensures a guest player exists in the session.
+  Plug that ensures a player exists in the session (either authenticated or guest).
 
   This runs during the initial HTTP request (before LiveView WebSocket upgrade)
   and can modify the session. It creates a guest player if one doesn't exist,
   or validates the existing session player.
   """
   def call(conn, _opts) do
-    player =
-      case get_session(conn, "current_player_id") do
+    # Check if user is authenticated (OAuth login)
+    if get_session(conn, "authenticated") do
+      player_id = get_session(conn, "current_player_id")
+
+      case Accounts.get_player(player_id) do
         nil ->
-          Logger.info("Creating new guest player (no session ID found)")
-          {:ok, player} = Accounts.create_guest_player()
-          Logger.info("Created guest player: #{player.id} (#{player.display_name})")
-          player
+          # Session invalid, create guest
+          create_and_assign_guest(conn)
 
-        player_id ->
-          Logger.info("Found session player_id: #{player_id}")
+        player ->
+          Logger.info("Authenticated player: #{player.id} (#{player.display_name})")
 
-          case Accounts.get_player(player_id) do
-            nil ->
-              Logger.warning("Session player_id #{player_id} not found in DB, creating new guest")
-
-              {:ok, player} = Accounts.create_guest_player()
-
-              Logger.info(
-                "Created replacement guest player: #{player.id} (#{player.display_name})"
-              )
-
-              player
-
-            player ->
-              Logger.info("Reusing existing guest player: #{player.id} (#{player.display_name})")
-              player
-          end
+          conn
+          |> put_session("current_player_id", player.id)
+          |> assign(:current_player, player)
       end
+    else
+      # Guest flow (unchanged)
+      player =
+        case get_session(conn, "current_player_id") do
+          nil ->
+            Logger.info("Creating new guest player (no session ID found)")
+            {:ok, player} = Accounts.create_guest_player()
+            Logger.info("Created guest player: #{player.id} (#{player.display_name})")
+            player
+
+          player_id ->
+            Logger.info("Found session player_id: #{player_id}")
+
+            case Accounts.get_player(player_id) do
+              nil ->
+                Logger.warning(
+                  "Session player_id #{player_id} not found in DB, creating new guest"
+                )
+
+                {:ok, player} = Accounts.create_guest_player()
+                Logger.info("Created replacement guest player: #{player.id}")
+                player
+
+              player ->
+                Logger.info("Reusing existing player: #{player.id} (#{player.display_name})")
+                player
+            end
+        end
+
+      conn
+      |> put_session("current_player_id", player.id)
+      |> assign(:current_player, player)
+    end
+  end
+
+  defp create_and_assign_guest(conn) do
+    {:ok, player} = Accounts.create_guest_player()
+    Logger.info("Created guest player: #{player.id} (#{player.display_name})")
 
     conn
+    |> configure_session(drop: true)
     |> put_session("current_player_id", player.id)
-    |> Plug.Conn.assign(:current_player, player)
+    |> assign(:current_player, player)
   end
 
   @doc """

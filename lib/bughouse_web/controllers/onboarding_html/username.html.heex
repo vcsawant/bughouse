@@ -1,0 +1,169 @@
+<div class="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4">
+  <div class="max-w-md w-full space-y-8">
+    <div class="text-center">
+      <h2 class="text-3xl font-bold">Create Your Account</h2>
+      <p class="mt-2 text-base-content/70">
+        Choose a username and display name for your Bughouse Chess account
+      </p>
+    </div>
+
+    <div class="card bg-base-200 shadow-xl">
+      <div class="card-body">
+        <form method="POST" action={~p"/onboarding/username"} id="onboarding-form">
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          
+<!-- Username Field -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-semibold">Username</span>
+            </label>
+
+            <div class="input-group">
+              <span class="bg-base-300 px-3 flex items-center">@</span>
+              <input
+                type="text"
+                name="username"
+                placeholder="johnsmith"
+                class={"input input-bordered w-full #{if @errors[:username], do: "input-error"}"}
+                value={assigns[:username] || @suggested_username}
+                id="username-input"
+                required
+                pattern="[a-zA-Z0-9_]{3,20}"
+                minlength="3"
+                maxlength="20"
+                autocomplete="off"
+              />
+            </div>
+
+            <label class="label">
+              <span class="label-text-alt text-base-content/60">
+                3-20 characters: letters, numbers, and underscores only
+              </span>
+            </label>
+            
+<!-- Real-time availability indicator -->
+            <div id="username-availability" class="mt-1 text-sm"></div>
+
+            <%= if @errors[:username] do %>
+              <div class="alert alert-error mt-2 py-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="stroke-current shrink-0 h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span class="text-sm">{Enum.join(@errors[:username], ", ")}</span>
+              </div>
+            <% end %>
+          </div>
+          
+<!-- Display Name Field -->
+          <div class="form-control mt-4">
+            <label class="label">
+              <span class="label-text font-semibold">Display Name</span>
+            </label>
+
+            <input
+              type="text"
+              name="display_name"
+              placeholder="John Smith"
+              class={"input input-bordered w-full #{if @errors[:display_name], do: "input-error"}"}
+              value={assigns[:display_name] || @suggested_display_name}
+              required
+              maxlength="50"
+            />
+
+            <label class="label">
+              <span class="label-text-alt text-base-content/60">
+                Your public name (can include spaces and special characters)
+              </span>
+            </label>
+
+            <%= if @errors[:display_name] do %>
+              <div class="alert alert-error mt-2 py-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="stroke-current shrink-0 h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span class="text-sm">{Enum.join(@errors[:display_name], ", ")}</span>
+              </div>
+            <% end %>
+          </div>
+          
+<!-- Submit Button -->
+          <div class="form-control mt-6">
+            <button type="submit" class="btn btn-primary btn-lg">
+              Create Account
+            </button>
+          </div>
+          
+<!-- Info -->
+          <div class="mt-4 text-center">
+            <p class="text-xs text-base-content/60">
+              You can change these later in your account settings
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Real-time username availability checking
+  const usernameInput = document.getElementById('username-input');
+  const availabilityDiv = document.getElementById('username-availability');
+  let debounceTimer;
+
+  usernameInput?.addEventListener('input', (e) => {
+    const username = e.target.value;
+
+    // Clear previous timer
+    clearTimeout(debounceTimer);
+
+    // Clear availability message if empty or invalid
+    if (!username || username.length < 3) {
+      availabilityDiv.textContent = '';
+      return;
+    }
+
+    // Show checking message
+    availabilityDiv.textContent = 'Checking availability...';
+    availabilityDiv.className = 'mt-1 text-sm text-base-content/60';
+
+    // Debounce API call
+    debounceTimer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/username/check/${encodeURIComponent(username)}`);
+        const data = await response.json();
+
+        if (data.available) {
+          availabilityDiv.textContent = `@${username} is available!`;
+          availabilityDiv.className = 'mt-1 text-sm text-success font-medium';
+        } else {
+          availabilityDiv.textContent = `@${username} is already taken`;
+          availabilityDiv.className = 'mt-1 text-sm text-error font-medium';
+        }
+      } catch (error) {
+        availabilityDiv.textContent = 'Error checking availability';
+        availabilityDiv.className = 'mt-1 text-sm text-error';
+      }
+    }, 500);
+  });
+</script>

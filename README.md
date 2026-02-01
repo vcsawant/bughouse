@@ -75,14 +75,17 @@ This creates a unique dynamic where players must balance their own game while co
   - Game state persists in database
 
 ### Phase 2: User Accounts & Tracking
-**Status:** Planned
+**Status:** In Progress
 
-- [ ] **Authentication System**
-  - User registration with username/email/password
-  - Secure login with bcrypt password hashing
-  - Session management
-  - Password reset flow
-  - User profiles with basic info
+- [x] **Authentication System**
+  - [x] Google OAuth integration
+  - [x] Secure session management
+  - [x] User profiles from OAuth data
+  - [x] Display name from Google account
+  - [x] Email confirmation tracking
+  - [ ] GitHub OAuth (prepared for future)
+  - [ ] Password-based authentication (optional)
+  - [ ] Password reset flow
 
 - [ ] **Game History**
   - View all past games
@@ -625,6 +628,66 @@ config :bughouse, Bughouse.Repo,
   hostname: "localhost",
   database: "bughouse_dev"
 ```
+
+### Google OAuth Authentication Setup
+
+The application supports Google OAuth for user authentication. To enable this feature:
+
+#### 1. Create Google OAuth Credentials
+
+1. Visit [Google Cloud Console](https://console.cloud.google.com)
+2. Create a new project: "Bughouse Chess"
+3. Enable the "Google+ API" (or Google Identity services)
+4. Navigate to "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"
+5. Application type: **Web application**
+6. Add authorized redirect URIs:
+   - Development: `http://localhost:4000/auth/google/callback`
+   - Production: `https://your-domain.com/auth/google/callback`
+7. Copy the **Client ID** and **Client Secret**
+
+#### 2. Configure Environment Variables
+
+```bash
+# Copy the example file
+cp .env .env
+
+# Edit .env with your credentials
+export GOOGLE_CLIENT_ID=your-actual-client-id-here
+export GOOGLE_CLIENT_SECRET=your-actual-client-secret-here
+export GOOGLE_REDIRECT_URI=http://localhost:4000/auth/google/callback
+
+# Load environment variables
+source .env
+
+# Start the server
+mix phx.server
+```
+
+**Important:** Never commit `.env` to version control. It's already in `.gitignore`.
+
+#### 3. Production Setup (Fly.io)
+
+For production deployment on Fly.io:
+
+```bash
+# Set secrets
+fly secrets set GOOGLE_CLIENT_ID=your-prod-client-id
+fly secrets set GOOGLE_CLIENT_SECRET=your-prod-client-secret
+fly secrets set GOOGLE_REDIRECT_URI=https://your-app.fly.dev/auth/google/callback
+
+# Deploy
+fly deploy
+```
+
+**Remember:** Update Google OAuth redirect URIs in the Cloud Console for production domain.
+
+#### How It Works
+
+- **Guest Players:** Users can play without signing in (Guest_XXXX)
+- **OAuth Login:** Sign in with Google to save progress across devices
+- **Display Name:** Pulled from Google (first name + last name), fallback to email
+- **Session Persistence:** Database-backed sessions work across devices
+- **Existing Games:** Prevents joining the same game twice
 
 ---
 

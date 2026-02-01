@@ -38,3 +38,6 @@ npm-debug.log
 # maybe we can add this back later when its useful
 .idea/
 
+# Environment variables (contains secrets)
+.env
+

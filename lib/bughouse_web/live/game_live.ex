@@ -516,6 +516,10 @@ defmodule BughouseWeb.GameLive do
           result={@game_state.result}
           result_reason={@game_state.result_reason}
           my_team={@my_team}
+          team_1_white={get_player_name(@players, @game.board_1_white_id)}
+          team_1_black={get_player_name(@players, @game.board_2_black_id)}
+          team_2_white={get_player_name(@players, @game.board_2_white_id)}
+          team_2_black={get_player_name(@players, @game.board_1_black_id)}
         />
       <% end %>
     </div>

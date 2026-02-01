@@ -22,6 +22,16 @@ defmodule BughouseWeb.Router do
     get "/game/new", PageController, :new_game
     post "/game", PageController, :create_game
 
+    # Authentication routes
+    get "/login", AuthController, :login
+    get "/logout", AuthController, :logout
+    get "/auth/:provider/request", AuthController, :request
+    get "/auth/:provider/callback", AuthController, :callback
+
+    # Onboarding routes
+    get "/onboarding/username", OnboardingController, :username
+    post "/onboarding/username", OnboardingController, :create_username
+
     live_session :game,
       on_mount: [{BughouseWeb.UserAuth, :ensure_guest_player}],
       layout: {BughouseWeb.Layouts, :app} do
@@ -30,10 +40,12 @@ defmodule BughouseWeb.Router do
     end
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", BughouseWeb do
-  #   pipe_through :api
-  # end
+  # API routes
+  scope "/api", BughouseWeb do
+    pipe_through :api
+
+    get "/username/check/:username", UsernameController, :check_availability
+  end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:bughouse, :dev_routes) do

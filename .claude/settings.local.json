@@ -37,7 +37,8 @@
       "Bash(mix deps.compile:*)",
       "Bash(mix clean:*)",
       "Bash(tree:*)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(mix run:*)"
     ]
   },
   "outputStyle": "Explanatory"
