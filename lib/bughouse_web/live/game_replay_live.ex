@@ -144,7 +144,8 @@ defmodule BughouseWeb.GameReplayLive do
     case Integer.parse(time_control) do
       {minutes, "min"} -> minutes * 60 * 1000
       {minutes, _} -> minutes * 60 * 1000
-      _ -> 10 * 60 * 1000  # Default: 10 minutes
+      # Default: 10 minutes
+      _ -> 10 * 60 * 1000
     end
   end
 
@@ -209,8 +210,8 @@ defmodule BughouseWeb.GameReplayLive do
           Result: <span class="font-semibold">{format_result(@game.result)}</span>
         </p>
       </div>
-
-      <!-- Two boards layout -->
+      
+    <!-- Two boards layout -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <!-- Board 1 -->
         <div class="flex flex-col">
@@ -228,13 +229,13 @@ defmodule BughouseWeb.GameReplayLive do
               can_select={false}
             />
           </div>
-
-          <!-- Chess Board -->
+          
+    <!-- Chess Board -->
           <div class="flex justify-center">
             <.chess_board fen={@board_1_fen} size="lg" theme="classic" flip={false} />
           </div>
-
-          <!-- Bottom player (White) with reserves -->
+          
+    <!-- Bottom player (White) with reserves -->
           <div class="mt-3">
             <div class="mb-1">
               <div class="font-semibold text-lg">{@players.board_1_white}</div>
@@ -249,8 +250,8 @@ defmodule BughouseWeb.GameReplayLive do
             />
           </div>
         </div>
-
-        <!-- Board 2 -->
+        
+    <!-- Board 2 -->
         <div class="flex flex-col">
           <!-- Top player (White) with reserves -->
           <div class="mb-3">
@@ -266,13 +267,13 @@ defmodule BughouseWeb.GameReplayLive do
               can_select={false}
             />
           </div>
-
-          <!-- Chess Board -->
+          
+    <!-- Chess Board -->
           <div class="flex justify-center">
             <.chess_board fen={@board_2_fen} size="lg" theme="classic" flip={true} />
           </div>
-
-          <!-- Bottom player (Black) with reserves -->
+          
+    <!-- Bottom player (Black) with reserves -->
           <div class="mt-3">
             <div class="mb-1">
               <div class="font-semibold text-lg">{@players.board_2_black}</div>
@@ -288,8 +289,8 @@ defmodule BughouseWeb.GameReplayLive do
           </div>
         </div>
       </div>
-
-      <!-- Replay controls -->
+      
+    <!-- Replay controls -->
       <div class="space-y-4 max-w-4xl mx-auto">
         <ReplayComponents.replay_controls
           playing={@playing}
@@ -303,8 +304,8 @@ defmodule BughouseWeb.GameReplayLive do
           move_markers={generate_move_markers(@move_history, @total_duration_ms)}
         />
       </div>
-
-      <!-- Hidden element to pass data to JavaScript hook -->
+      
+    <!-- Hidden element to pass data to JavaScript hook -->
       <div
         id="replay-data"
         phx-hook="ReplayPlayer"
@@ -336,7 +337,7 @@ defmodule BughouseWeb.GameReplayLive do
 
     if current_move && last_move && last_move.timestamp > 0 do
       # Progress based on actual game time, not move count
-      (current_move.timestamp / last_move.timestamp) * 100
+      current_move.timestamp / last_move.timestamp * 100
     else
       0.0
     end
@@ -353,7 +354,7 @@ defmodule BughouseWeb.GameReplayLive do
     end)
     |> Enum.map(fn {move, idx} ->
       # Calculate percentage based on total duration (including buffer)
-      percent = (move.timestamp / total_duration_ms) * 100
+      percent = move.timestamp / total_duration_ms * 100
       {idx, percent}
     end)
   end

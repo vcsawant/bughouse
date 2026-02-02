@@ -32,6 +32,11 @@ defmodule Bughouse.Accounts do
   def get_player!(id), do: Repo.get!(Player, id)
 
   @doc """
+  Gets a player by username. Returns nil if not found.
+  """
+  def get_player_by_username(username), do: Repo.get_by(Player, username: username)
+
+  @doc """
   Updates player stats after game completion.
   """
   def update_player_stats(%Player{} = player, %{outcome: outcome, rating_change: rating_change}) do

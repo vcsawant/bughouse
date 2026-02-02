@@ -42,13 +42,13 @@ defmodule BughouseWeb.ReplayComponents do
       >
         <.icon name={if @playing, do: "hero-pause", else: "hero-play"} class="size-6" />
       </button>
-
-      <!-- Move Indicator -->
+      
+    <!-- Move Indicator -->
       <div class="text-lg font-medium">
-        Move <%= @current_move + 1 %> / <%= @total_moves %>
+        Move {@current_move + 1} / {@total_moves}
       </div>
-
-      <!-- Speed Selector -->
+      
+    <!-- Speed Selector -->
       <div class="join">
         <%= for speed <- [1.0, 2.0, 3.0, 4.0, 5.0] do %>
           <button
@@ -60,7 +60,7 @@ defmodule BughouseWeb.ReplayComponents do
             data-speed={speed}
             aria-label={"Playback speed #{trunc(speed)}x"}
           >
-            <%= trunc(speed) %>x
+            {trunc(speed)}x
           </button>
         <% end %>
       </div>
@@ -104,8 +104,8 @@ defmodule BughouseWeb.ReplayComponents do
         class="absolute top-0 left-0 h-full bg-primary rounded-lg"
         style="width: 0%"
       />
-
-      <!-- Move Markers -->
+      
+    <!-- Move Markers -->
       <%= for {move_num, percent} <- @move_markers do %>
         <div
           class="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 bg-base-content/40 pointer-events-none"
@@ -113,15 +113,15 @@ defmodule BughouseWeb.ReplayComponents do
           title={"Move #{move_num}"}
         />
       <% end %>
-
-      <!-- Current Position Indicator (updated via JavaScript for smooth interpolation) -->
+      
+    <!-- Current Position Indicator (updated via JavaScript for smooth interpolation) -->
       <div
         data-progress-indicator
         class="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-primary rounded-full shadow-lg pointer-events-none"
         style="left: -8px"
       />
-
-      <!-- Hover Indicator (shown when hovering) -->
+      
+    <!-- Hover Indicator (shown when hovering) -->
       <div class="absolute inset-0 opacity-0 group-hover:opacity-20 bg-primary rounded-lg transition-opacity pointer-events-none" />
     </div>
     """

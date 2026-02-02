@@ -308,10 +308,10 @@ defmodule BughouseWeb.ChessComponents do
     <!-- Clock Display (MM:SS format, updated via JavaScript) -->
         <div class="flex items-center gap-1 text-3xl font-mono tabular-nums">
           <!-- Minutes -->
-          <span data-minutes><%= @minutes %></span>
+          <span data-minutes>{@minutes}</span>
           <span class={[@active && "animate-pulse"]}>:</span>
           <!-- Seconds -->
-          <span data-seconds><%= String.pad_leading(to_string(@seconds), 2, "0") %></span>
+          <span data-seconds>{String.pad_leading(to_string(@seconds), 2, "0")}</span>
         </div>
       </div>
 

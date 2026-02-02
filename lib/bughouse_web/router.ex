@@ -38,6 +38,7 @@ defmodule BughouseWeb.Router do
       live "/lobby/:invite_code", LobbyLive
       live "/game/:invite_code", GameLive
       live "/game/view/:invite_code", GameReplayLive
+      live "/player/:username", PlayerProfileLive
     end
 
     # Authenticated-only routes
