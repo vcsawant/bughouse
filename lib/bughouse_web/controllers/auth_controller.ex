@@ -24,12 +24,14 @@ defmodule BughouseWeb.AuthController do
     case Assent.Strategy.Google.authorize_url(config) do
       {:ok, %{url: url, session_params: session_params} = result} ->
         Logger.debug("authorize_url result: #{inspect(result)}")
-        state = session_params[:state]  # Use atom key, not string key
+        # Use atom key, not string key
+        state = session_params[:state]
         Logger.debug("OAuth request - storing state: #{inspect(state)}")
 
         conn
         |> put_session(:oauth_state, state)
-        |> configure_session(renew: true)  # Force session to be written
+        # Force session to be written
+        |> configure_session(renew: true)
         |> redirect(external: url)
 
       {:error, error} ->
@@ -41,7 +43,7 @@ defmodule BughouseWeb.AuthController do
     end
   end
 
-  def callback(conn, %{"provider" => "google", "code" => code, "state" => state} = params) do
+  def callback(conn, %{"provider" => "google", "code" => _code, "state" => state} = params) do
     config = Application.get_env(:bughouse, :oauth)[:google]
     stored_state = get_session(conn, :oauth_state)
 
@@ -49,9 +51,7 @@ defmodule BughouseWeb.AuthController do
     Logger.debug("OAuth callback - stored state: #{inspect(stored_state)}")
 
     if state != stored_state do
-      Logger.error(
-        "OAuth state mismatch! Received: #{state}, Stored: #{inspect(stored_state)}"
-      )
+      Logger.error("OAuth state mismatch! Received: #{state}, Stored: #{inspect(stored_state)}")
 
       conn
       |> put_flash(:error, "Invalid state parameter. Please try signing in again.")

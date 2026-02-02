@@ -38,6 +38,13 @@ defmodule BughouseWeb.Router do
       live "/lobby/:invite_code", LobbyLive
       live "/game/:invite_code", GameLive
     end
+
+    # Authenticated-only routes
+    live_session :authenticated,
+      on_mount: [{BughouseWeb.UserAuth, :require_authenticated}],
+      layout: {BughouseWeb.Layouts, :app} do
+      live "/account", AccountLive
+    end
   end
 
   # API routes

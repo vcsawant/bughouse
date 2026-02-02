@@ -130,19 +130,74 @@ defmodule Bughouse.Games do
   end
 
   @doc """
-  Get rating history over time.
+  Get rating history over time, optionally filtered by time period.
+
+  Time periods: :day, :month, :three_months, or nil for all time.
   """
-  def get_rating_history(player_id) do
+  def get_rating_history(player_id, time_period \\ nil) do
+    base_query =
+      from(gp in GamePlayer,
+        where: gp.player_id == ^player_id and not is_nil(gp.rating_after),
+        order_by: [asc: gp.created_at],
+        select: %{
+          timestamp: gp.created_at,
+          rating: gp.rating_after,
+          change: gp.rating_change
+        }
+      )
+
+    query =
+      case time_period do
+        :day ->
+          cutoff = DateTime.utc_now() |> DateTime.add(-1, :day)
+          from(gp in base_query, where: gp.created_at >= ^cutoff)
+
+        :month ->
+          cutoff = DateTime.utc_now() |> DateTime.add(-30, :day)
+          from(gp in base_query, where: gp.created_at >= ^cutoff)
+
+        :three_months ->
+          cutoff = DateTime.utc_now() |> DateTime.add(-90, :day)
+          from(gp in base_query, where: gp.created_at >= ^cutoff)
+
+        _ ->
+          base_query
+      end
+
+    Repo.all(query)
+  end
+
+  @doc """
+  Lists recent completed games for a player with all players preloaded.
+
+  Returns list of tuples: {game, game_player}
+  - game: The full game record with all 4 players preloaded
+  - game_player: The GamePlayer record for this player
+
+  Ordered by most recent first, limited to specified count (default 100).
+  """
+  def list_player_games(player_id, limit \\ 100) do
     from(gp in GamePlayer,
-      where: gp.player_id == ^player_id and not is_nil(gp.rating_after),
-      order_by: [asc: gp.created_at],
-      select: %{
-        timestamp: gp.created_at,
-        rating: gp.rating_after,
-        change: gp.rating_change
-      }
+      where: gp.player_id == ^player_id,
+      join: g in assoc(gp, :game),
+      where: g.status == :completed,
+      order_by: [desc: gp.created_at],
+      limit: ^limit,
+      select: {g, gp}
     )
     |> Repo.all()
+    |> Enum.map(fn {game, game_player} ->
+      # Preload all 4 players for each game
+      game =
+        Repo.preload(game, [
+          :board_1_white,
+          :board_1_black,
+          :board_2_white,
+          :board_2_black
+        ])
+
+      {game, game_player}
+    end)
   end
 
   @doc """

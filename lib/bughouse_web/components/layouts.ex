@@ -128,6 +128,11 @@ defmodule BughouseWeb.Layouts do
           </li>
           <div class="divider my-0"></div>
           <li>
+            <a href={~p"/account"}>
+              <.icon name="hero-user" class="size-4" /> Account
+            </a>
+          </li>
+          <li>
             <a href={~p"/logout"}>
               <.icon name="hero-arrow-left-on-rectangle" class="size-4" /> Sign Out
             </a>

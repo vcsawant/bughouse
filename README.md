@@ -689,6 +689,83 @@ fly deploy
 - **Session Persistence:** Database-backed sessions work across devices
 - **Existing Games:** Prevents joining the same game twice
 
+### Account Features
+
+Once you've signed in with Google, you can access your account page with comprehensive features for managing your profile and viewing your game history.
+
+#### Accessing Your Account
+
+Authenticated users can access their account page by:
+- Clicking the user icon in the navigation bar
+- Selecting "Account" from the dropdown menu
+- Navigating directly to `/account`
+
+**Note:** Guest users cannot access the account page and will be redirected to `/login`.
+
+#### Profile Tab
+
+View and manage your account information:
+
+- **Username**: Your unique identifier starting with @ (read-only)
+- **Email**: Your registered email address from Google OAuth (read-only)
+- **Display Name**: Your public name (editable - click the pencil icon to change)
+- **Connected Accounts**: OAuth providers you've linked (Google, with GitHub coming soon)
+- **Member Since**: Account creation date
+
+The profile tab makes it easy to customize how you appear to other players while keeping your core account information secure.
+
+#### Game History Tab
+
+Track your chess performance over time with comprehensive statistics and game records:
+
+**Rating Statistics:**
+- **Current Rating**: Your active Elo rating
+- **Peak Rating**: Your highest rating achieved
+- **Total Games**: Complete count of games played
+- **Record**: Win/Loss/Draw breakdown
+
+**Rating History Graph:**
+- Visual representation of your rating progression over time
+- Interactive time period filters:
+  - **1d**: Last 24 hours
+  - **1m**: Last 30 days
+  - **3m**: Last 90 days
+  - **All**: Complete history
+- Custom date range selector (coming soon)
+- *Note: Full interactive graph with Chart.js coming in a future update*
+
+**Recent Games Table:**
+- Displays your last 100 games (paginated, 25 per page)
+- Each game row shows:
+  - **Game ID**: Unique invite code for the game (future: click to replay)
+  - **Position**: Your board and color (e.g., "Board 1 White", "Board 2 Black")
+  - **Teammate**: Your partner's username (Bughouse is a team game!)
+  - **Opponents**: Both opposing players' usernames
+  - **Result**: Win/Loss/Draw with color-coded badges
+  - **Rating Change**: Points gained or lost (+/- with green/red indicators)
+- Bughouse-specific team information respects the unique pairing:
+  - Team 1: Board 1 White + Board 2 Black
+  - Team 2: Board 1 Black + Board 2 White
+- Username links to player profiles (coming soon)
+- Guest players display as "guest" in a muted style
+
+**Pagination:**
+- Navigate through your game history 25 games at a time
+- Up to 4 pages of recent games (100 total)
+- Active page highlighted for easy navigation
+
+#### Friends Tab
+
+**Coming Soon!** Friend management and social features will be added in a future update, including:
+- Send and accept friend requests
+- View friends list with online status
+- Challenge friends to games
+- Head-to-head statistics
+- Recent games with friends
+- Friend activity feed
+
+Stay tuned for these exciting social features that will make it even easier to play with your regular chess partners!
+
 ---
 
 ## 📝 Code Organization

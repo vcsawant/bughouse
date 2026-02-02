@@ -116,4 +116,38 @@ defmodule BughouseWeb.UserAuth do
     socket = Phoenix.Component.assign(socket, :current_player, player)
     {:cont, socket}
   end
+
+  # LiveView hook that requires authenticated (non-guest) users.
+  # Redirects to /login if user is guest or not authenticated.
+  def on_mount(:require_authenticated, _params, session, socket) do
+    alias Bughouse.Schemas.Accounts.Player
+
+    case session["authenticated"] do
+      true ->
+        player_id = session["current_player_id"]
+
+        case Accounts.get_player(player_id) do
+          %Player{guest: false} = player ->
+            {:cont, Phoenix.Component.assign(socket, :current_player, player)}
+
+          _ ->
+            # Guest or invalid player
+            socket =
+              socket
+              |> Phoenix.LiveView.put_flash(:error, "Please sign in to view your account")
+              |> Phoenix.LiveView.redirect(to: "/login")
+
+            {:halt, socket}
+        end
+
+      _ ->
+        # Not authenticated
+        socket =
+          socket
+          |> Phoenix.LiveView.put_flash(:error, "Please sign in to view your account")
+          |> Phoenix.LiveView.redirect(to: "/login")
+
+        {:halt, socket}
+    end
+  end
 end

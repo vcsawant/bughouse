@@ -243,6 +243,26 @@ defmodule Bughouse.Accounts do
   end
 
   @doc """
+  Updates a player's display name only.
+  """
+  def update_player_display_name(%Player{} = player, display_name) do
+    player
+    |> Player.changeset(%{display_name: display_name})
+    |> Repo.update()
+  end
+
+  @doc """
+  Gets a player with preloaded OAuth identities.
+  """
+  def get_player_with_identities(player_id) do
+    from(p in Player,
+      where: p.id == ^player_id,
+      preload: [:user_identities]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Suggests a username from OAuth user params.
   Returns a clean, URL-safe username suggestion (not guaranteed to be available).
   """

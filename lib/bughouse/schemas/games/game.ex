@@ -28,6 +28,12 @@ defmodule Bughouse.Schemas.Games.Game do
 
     has_many :game_players, Bughouse.Schemas.Games.GamePlayer
 
+    # Player associations for preloading (using existing *_id fields)
+    belongs_to :board_1_white, Bughouse.Schemas.Accounts.Player, define_field: false
+    belongs_to :board_1_black, Bughouse.Schemas.Accounts.Player, define_field: false
+    belongs_to :board_2_white, Bughouse.Schemas.Accounts.Player, define_field: false
+    belongs_to :board_2_black, Bughouse.Schemas.Accounts.Player, define_field: false
+
     timestamps(type: :utc_datetime)
   end
 
