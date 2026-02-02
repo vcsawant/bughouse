@@ -43,6 +43,47 @@ defmodule Bughouse.Games do
   def get_game_by_invite_code!(code), do: Repo.get_by!(Game, invite_code: code)
 
   @doc """
+  Gets a completed game with all data needed for replay.
+
+  Returns `{:ok, game}` with preloaded players if successful, or:
+  - `{:error, :not_found}` if game doesn't exist
+  - `{:error, :not_completed}` if game is still in progress
+  - `{:error, :no_moves}` if game has no recorded moves
+
+  ## Examples
+
+      iex> get_game_for_replay("ABC123")
+      {:ok, %Game{moves: [...], board_1_white: %Player{}, ...}}
+
+      iex> get_game_for_replay("invalid")
+      {:error, :not_found}
+  """
+  def get_game_for_replay(invite_code) do
+    case get_game_by_invite_code(invite_code) do
+      nil ->
+        {:error, :not_found}
+
+      %Game{status: status} = _game when status != :completed ->
+        {:error, :not_completed}
+
+      %Game{moves: []} = _game ->
+        {:error, :no_moves}
+
+      game ->
+        # Preload all players for display
+        game =
+          Repo.preload(game, [
+            :board_1_white,
+            :board_1_black,
+            :board_2_white,
+            :board_2_black
+          ])
+
+        {:ok, game}
+    end
+  end
+
+  @doc """
   Subscribes the current process to real-time updates for a game.
 
   Subscribe in LiveView mount to receive broadcasts when players join/leave or game starts.

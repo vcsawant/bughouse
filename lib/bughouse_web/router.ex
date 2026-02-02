@@ -37,6 +37,7 @@ defmodule BughouseWeb.Router do
       layout: {BughouseWeb.Layouts, :app} do
       live "/lobby/:invite_code", LobbyLive
       live "/game/:invite_code", GameLive
+      live "/game/view/:invite_code", GameReplayLive
     end
 
     # Authenticated-only routes

@@ -24,6 +24,7 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/bughouse"
 import topbar from "../vendor/topbar"
+import {ReplayPlayer} from "./hooks/replay_player_hook"
 
 // Shared clock state manager - ensures all clocks tick in sync
 const ClockManager = {
@@ -96,14 +97,9 @@ const ChessClockCountdown = {
     // Phoenix renders: active={true} → data-active (no value), active={false} → no attribute
     this.active = this.el.hasAttribute('data-active')
 
-    // Get countdown elements (the inner spans with --value style)
-    // DaisyUI countdown structure: <span class="countdown"><span style="--value:X"></span></span>
-    const minutesContainer = this.el.querySelector('[data-minutes]')
-    const secondsContainer = this.el.querySelector('[data-seconds]')
-
-    // Get the inner span elements that hold the --value
-    this.minutesEl = minutesContainer?.querySelector('span')
-    this.secondsEl = secondsContainer?.querySelector('span')
+    // Get countdown elements (direct text spans)
+    this.minutesEl = this.el.querySelector('[data-minutes]')
+    this.secondsEl = this.el.querySelector('[data-seconds]')
 
     // Register with the shared manager
     ClockManager.register(this)
@@ -114,10 +110,8 @@ const ChessClockCountdown = {
 
   updated() {
     // Re-query DOM elements in case LiveView replaced them during re-render
-    const minutesContainer = this.el.querySelector('[data-minutes]')
-    const secondsContainer = this.el.querySelector('[data-seconds]')
-    this.minutesEl = minutesContainer?.querySelector('span')
-    this.secondsEl = secondsContainer?.querySelector('span')
+    this.minutesEl = this.el.querySelector('[data-minutes]')
+    this.secondsEl = this.el.querySelector('[data-seconds]')
 
     // Reconcile with server time
     const newTimeMs = parseInt(this.el.dataset.timeMs) || 0
@@ -154,9 +148,9 @@ const ChessClockCountdown = {
     const minutes = Math.floor(totalSeconds / 60)
     const seconds = totalSeconds % 60
 
-    // Update DaisyUI countdown values on the inner span elements
-    this.minutesEl.style.setProperty('--value', minutes)
-    this.secondsEl.style.setProperty('--value', seconds)
+    // Update clock display directly via textContent (instant, no jitter)
+    this.minutesEl.textContent = minutes
+    this.secondsEl.textContent = seconds.toString().padStart(2, '0')
   },
 
   destroyed() {
@@ -336,7 +330,8 @@ const liveSocket = new LiveSocket("/live", Socket, {
     ...colocatedHooks,
     ChessClockCountdown,
     ChessPieceHover,
-    ChessPieceDrag
+    ChessPieceDrag,
+    ReplayPlayer
   },
 })
 

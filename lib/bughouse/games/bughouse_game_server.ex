@@ -14,6 +14,8 @@ defmodule Bughouse.Games.BughouseGameServer do
     # Game metadata
     :game_id,
     :invite_code,
+    # Monotonic time when game started (for relative timestamps)
+    :game_start_time,
 
     # Board processes (binbo_bughouse)
     :board_1_pid,
@@ -170,6 +172,7 @@ defmodule Bughouse.Games.BughouseGameServer do
       state = %__MODULE__{
         game_id: game.id,
         invite_code: game.invite_code,
+        game_start_time: now,
         board_1_pid: board_1_pid,
         board_2_pid: board_2_pid,
         board_1_white_id: game.board_1_white_id,
@@ -518,16 +521,31 @@ defmodule Bughouse.Games.BughouseGameServer do
     now = System.monotonic_time(:millisecond)
     current_clocks = calculate_current_clocks(state, now)
 
+    # Capture board states after the move
+    {:ok, board_1_fen} = :binbo_bughouse.get_fen(state.board_1_pid)
+    {:ok, board_2_fen} = :binbo_bughouse.get_fen(state.board_2_pid)
+    {:ok, board_1_reserves} = :binbo_bughouse.get_reserves(state.board_1_pid)
+    {:ok, board_2_reserves} = :binbo_bughouse.get_reserves(state.board_2_pid)
+
     move_record = %{
       board: board_num,
       position: position,
       type: move_type,
       notation: notation,
-      timestamp: now,
+      # Store timestamp relative to game start (first move = 0ms)
+      timestamp: now - state.game_start_time,
       board_1_white_time: current_clocks.board_1_white,
       board_1_black_time: current_clocks.board_1_black,
       board_2_white_time: current_clocks.board_2_white,
-      board_2_black_time: current_clocks.board_2_black
+      board_2_black_time: current_clocks.board_2_black,
+      # Board states for replay
+      board_1_fen: extract_piece_placement(board_1_fen),
+      board_2_fen: extract_piece_placement(board_2_fen),
+      # Each player has their own reserves
+      board_1_white_reserves: serialize_reserves(board_1_reserves.white),
+      board_1_black_reserves: serialize_reserves(board_1_reserves.black),
+      board_2_white_reserves: serialize_reserves(board_2_reserves.white),
+      board_2_black_reserves: serialize_reserves(board_2_reserves.black)
     }
 
     %{state | move_history: [move_record | state.move_history]}

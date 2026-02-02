@@ -305,21 +305,13 @@ defmodule BughouseWeb.ChessComponents do
           </span>
         <% end %>
         
-    <!-- DaisyUI Countdown Component (MM:SS format) -->
-        <div class="grid grid-flow-col gap-1 text-center auto-cols-max">
+    <!-- Clock Display (MM:SS format, updated via JavaScript) -->
+        <div class="flex items-center gap-1 text-3xl font-mono tabular-nums">
           <!-- Minutes -->
-          <div class="flex flex-col">
-            <span class="countdown tabular-nums text-3xl" data-minutes>
-              <span style={"--value:#{@minutes};"}></span>
-            </span>
-          </div>
+          <span data-minutes><%= @minutes %></span>
           <span class={[@active && "animate-pulse"]}>:</span>
           <!-- Seconds -->
-          <div class="flex flex-col">
-            <span class="countdown tabular-nums text-3xl" data-seconds>
-              <span style={"--value:#{@seconds};"}></span>
-            </span>
-          </div>
+          <span data-seconds><%= String.pad_leading(to_string(@seconds), 2, "0") %></span>
         </div>
       </div>
 

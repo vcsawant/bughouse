@@ -768,6 +768,90 @@ Stay tuned for these exciting social features that will make it even easier to p
 
 ---
 
+### Game Replay Viewer
+
+After a game ends, you can watch a full replay with video-like playback controls that recreate the game exactly as it was played.
+
+#### Watching Completed Games
+
+**Access a Replay:**
+- Click a game ID from your **Account > Game History** tab
+- Navigate to `/game/view/:invite_code` directly
+- Share replay URLs with friends to show them your games
+
+#### Playback Features
+
+**Video-Like Controls:**
+
+- **Play/Pause**: Watch the game play out automatically with moves occurring at their actual timing
+- **Speed Control**: Choose from 1x, 2x (default), 3x, 4x, or 5x playback speed
+  - 2x speed is default for a good balance of speed and followability
+  - 5x speed lets you quickly review long games
+  - 1x speed recreates the exact real-time experience
+- **Progress Bar with Scrubbing**: Drag the progress bar to jump to any point in the game instantly
+  - Visual move markers show where moves occurred
+  - Click anywhere on the bar to seek to that moment
+- **Move Navigation**: Use Previous/Next buttons to step through moves one at a time
+
+**What You'll See:**
+
+- **Both Chess Boards**: Displayed side-by-side just like during the live game
+- **All Four Player Clocks**: Counting down smoothly with precise timing
+- **Captured Pieces**: Appearing in team reserves as they're captured
+- **Piece Drops and Promotions**: Accurately recreated with proper piece placement
+- **Game Result**: Final result and reason displayed (checkmate, timeout, resignation)
+
+**Keyboard Shortcuts:**
+
+Make navigation even faster with these keyboard controls:
+
+- **Space**: Play/Pause
+- **← (Left Arrow)**: Previous move
+- **→ (Right Arrow)**: Next move
+- **1-5 (Number Keys)**: Set playback speed (1x through 5x)
+- **Home**: Jump to start (coming soon)
+- **End**: Jump to end (coming soon)
+
+#### How It Works
+
+The replay system uses the complete move history with precise timestamps to recreate the game deterministically. Every move, capture, drop, and clock tick is replayed exactly as it happened, scaled by your chosen playback speed.
+
+**Technical Details:**
+- Moves are played at their actual timing intervals (e.g., if a player thought for 15 seconds, the replay pauses for 15 seconds at 1x speed, or 7.5 seconds at 2x speed)
+- Clocks interpolate smoothly between moves for a polished viewing experience
+- Complete board state (FEN and reserves) stored with every move for deterministic replay
+- Instant scrubbing to any point - no reconstruction needed
+- All playback happens client-side after initial load for smooth 60fps performance
+- Works even if your internet connection drops during replay
+
+**Implementation:**
+
+The replay system captures complete board state (FEN and reserves) with every move during gameplay. This allows deterministic, instant replay without reconstructing positions. Each move stores:
+
+- FEN notation for both boards (piece placement)
+- Captured piece reserves for both teams
+- Clock times for all four players
+- Move timestamp for time-based playback
+
+This approach trades ~9KB of storage per game for replay simplicity and speed. All chess logic stays server-side - JavaScript simply displays stored positions.
+
+#### Use Cases
+
+- **Learning**: Review your games to find mistakes and identify improvements
+- **Sharing**: Show exciting games to friends or on social media
+- **Analysis**: Study high-level games move-by-move at any speed
+- **Entertainment**: Watch Bughouse games like watching a chess video
+- **Coaching**: Teachers can use replays to demonstrate tactics and strategies
+
+**Future Enhancements:**
+- Move list sidebar with algebraic notation
+- Analysis mode showing best moves and blunders
+- Export replays as GIF/MP4 videos
+- Add annotations and comments to specific moves
+- Slow-motion playback (0.5x, 0.25x) for detailed analysis
+
+---
+
 ## 📝 Code Organization
 
 ### Directory Structure
