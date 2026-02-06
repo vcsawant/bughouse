@@ -143,8 +143,18 @@ defmodule BughouseWeb.GameHistoryComponents do
   attr :game_player, :map, required: true
 
   def game_row(assigns) do
+    # Derive position by matching player_id against the game's position assignments.
+    # This is the single source of truth — the game record already holds who sat where.
+    position =
+      cond do
+        assigns.game.board_1_white_id == assigns.game_player.player_id -> "board_1_white"
+        assigns.game.board_1_black_id == assigns.game_player.player_id -> "board_1_black"
+        assigns.game.board_2_white_id == assigns.game_player.player_id -> "board_2_white"
+        assigns.game.board_2_black_id == assigns.game_player.player_id -> "board_2_black"
+      end
+
     position_name =
-      case assigns.game_player.position do
+      case position do
         "board_1_white" -> "Board 1 White"
         "board_1_black" -> "Board 1 Black"
         "board_2_white" -> "Board 2 White"
@@ -153,7 +163,7 @@ defmodule BughouseWeb.GameHistoryComponents do
 
     # Bughouse teams: board_1_white + board_2_black vs board_1_black + board_2_white
     teammate =
-      case assigns.game_player.position do
+      case position do
         "board_1_white" -> assigns.game.board_2_black
         "board_1_black" -> assigns.game.board_2_white
         "board_2_white" -> assigns.game.board_1_black
@@ -161,7 +171,7 @@ defmodule BughouseWeb.GameHistoryComponents do
       end
 
     {opp1, opp2} =
-      case assigns.game_player.position do
+      case position do
         "board_1_white" -> {assigns.game.board_1_black, assigns.game.board_2_white}
         "board_1_black" -> {assigns.game.board_1_white, assigns.game.board_2_black}
         "board_2_white" -> {assigns.game.board_1_white, assigns.game.board_2_black}

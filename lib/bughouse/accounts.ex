@@ -5,7 +5,7 @@ defmodule Bughouse.Accounts do
 
   import Ecto.Query, warn: false
   alias Bughouse.Repo
-  alias Bughouse.Schemas.Accounts.{Player, Friendship, UserIdentity}
+  alias Bughouse.Schemas.Accounts.{Player, Friendship, UserIdentity, Bot}
   alias Ecto.Multi
   require Logger
 
@@ -81,6 +81,17 @@ defmodule Bughouse.Accounts do
     from(f in Friendship,
       where: (f.player_id == ^player_id or f.friend_id == ^player_id) and f.status == :accepted,
       preload: [:player, :friend]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns all bots currently marked online, with their player records preloaded.
+  """
+  def list_available_bots do
+    from(b in Bot,
+      where: b.status == "online",
+      preload: :player
     )
     |> Repo.all()
   end

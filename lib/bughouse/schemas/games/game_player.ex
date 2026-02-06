@@ -9,9 +9,6 @@ defmodule Bughouse.Schemas.Games.GamePlayer do
     belongs_to :game, Bughouse.Schemas.Games.Game
     belongs_to :player, Bughouse.Schemas.Accounts.Player
 
-    field :position, :string
-    field :color, :string
-    field :board, :integer
     field :rating_before, :integer
     field :rating_after, :integer
     field :rating_change, :integer
@@ -27,9 +24,6 @@ defmodule Bughouse.Schemas.Games.GamePlayer do
     |> cast(attrs, [
       :game_id,
       :player_id,
-      :position,
-      :color,
-      :board,
       :rating_before,
       :rating_after,
       :rating_change,
@@ -39,14 +33,9 @@ defmodule Bughouse.Schemas.Games.GamePlayer do
     |> validate_required([
       :game_id,
       :player_id,
-      :position,
-      :color,
-      :board,
       :rating_before,
       :outcome
     ])
-    |> validate_inclusion(:color, ["white", "black"])
-    |> validate_inclusion(:board, [1, 2])
     |> foreign_key_constraint(:game_id)
     |> foreign_key_constraint(:player_id)
   end

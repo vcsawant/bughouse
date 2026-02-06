@@ -1,6 +1,7 @@
 defmodule BughouseWeb.LobbyLive do
   use BughouseWeb, :live_view
   alias Bughouse.Games
+  alias Bughouse.Accounts
 
   @impl true
   def mount(%{"invite_code" => code}, _session, socket) do
@@ -30,13 +31,17 @@ defmodule BughouseWeb.LobbyLive do
 
         Logger.info("LobbyLive: Loaded game #{game.id}, my_position=#{inspect(my_position)}")
 
+        available_bots = Accounts.list_available_bots()
+
         {:ok,
          socket
          |> assign(:invite_code, code)
          |> assign(:game, game)
          |> assign(:players, players)
          |> assign(:my_position, my_position)
-         |> assign(:share_url, url(socket, ~p"/lobby/#{code}"))}
+         |> assign(:share_url, url(socket, ~p"/lobby/#{code}"))
+         |> assign(:available_bots, available_bots)
+         |> assign(:bot_player_ids, MapSet.new(available_bots, fn b -> b.player.id end))}
     end
   end
 
@@ -89,6 +94,37 @@ defmodule BughouseWeb.LobbyLive do
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Could not leave")}
+    end
+  end
+
+  def handle_event(
+        "add_bot",
+        %{"bot_player_id" => bot_id, "position" => pos_str, "mode" => mode},
+        socket
+      ) do
+    game_id = socket.assigns.game.id
+
+    result =
+      case mode do
+        "dual" ->
+          team = position_to_team(String.to_existing_atom(pos_str))
+          Games.join_game_as_dual_bot(game_id, bot_id, team)
+
+        _ ->
+          position = String.to_existing_atom(pos_str)
+          Games.join_game(game_id, bot_id, position)
+      end
+
+    case result do
+      {:ok, _} -> {:noreply, socket}
+      {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to add bot: #{reason}")}
+    end
+  end
+
+  def handle_event("remove_bot", %{"player_id" => player_id}, socket) do
+    case Games.leave_game_all_positions(socket.assigns.game.id, player_id) do
+      {:ok, _} -> {:noreply, socket}
+      {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to remove bot: #{reason}")}
     end
   end
 
@@ -163,6 +199,54 @@ defmodule BughouseWeb.LobbyLive do
       not is_nil(game.board_2_black_id)
   end
 
+  defp teammate_position(:board_1_white), do: :board_2_black
+  defp teammate_position(:board_2_black), do: :board_1_white
+  defp teammate_position(:board_1_black), do: :board_2_white
+  defp teammate_position(:board_2_white), do: :board_1_black
+
+  defp position_to_team(:board_1_white), do: :team_1
+  defp position_to_team(:board_2_black), do: :team_1
+  defp position_to_team(:board_1_black), do: :team_2
+  defp position_to_team(:board_2_white), do: :team_2
+
+  defp bot_player?(bot_player_ids, player_id) do
+    player_id && MapSet.member?(bot_player_ids, player_id)
+  end
+
+  defp is_dual_bot?(game, position, player_id) do
+    tm = teammate_position(position)
+    Map.get(game, :"#{tm}_id") == player_id
+  end
+
+  # Produces [{bot, mode}, ...] for the dropdown of a given open seat.
+  # Excludes bots already in a game position; offers "dual" when the teammate
+  # seat is also open and the bot's supported_modes allows it.
+  defp filter_bots_for_position(game, position, available_bots) do
+    in_game_ids =
+      [:board_1_white_id, :board_1_black_id, :board_2_white_id, :board_2_black_id]
+      |> Enum.map(fn field -> Map.get(game, field) end)
+      |> Enum.filter(&(&1 != nil))
+      |> MapSet.new()
+
+    teammate_open = !position_occupied?(game, teammate_position(position))
+
+    available_bots
+    |> Enum.reject(fn b -> MapSet.member?(in_game_ids, b.player.id) end)
+    |> Enum.flat_map(fn bot ->
+      single =
+        if bot.supported_modes in ["single", "both"],
+          do: [{bot, "single"}],
+          else: []
+
+      dual =
+        if teammate_open && bot.supported_modes in ["dual", "both"],
+          do: [{bot, "dual"}],
+          else: []
+
+      single ++ dual
+    end)
+  end
+
   # Template (render function)
   @impl true
   def render(assigns) do
@@ -222,6 +306,8 @@ defmodule BughouseWeb.LobbyLive do
                   game={@game}
                   players={@players}
                   my_position={@my_position}
+                  available_bots={@available_bots}
+                  bot_player_ids={@bot_player_ids}
                 />
                 <.player_seat
                   position={:board_2_white}
@@ -230,6 +316,8 @@ defmodule BughouseWeb.LobbyLive do
                   game={@game}
                   players={@players}
                   my_position={@my_position}
+                  available_bots={@available_bots}
+                  bot_player_ids={@bot_player_ids}
                 />
               </div>
             </div>
@@ -264,6 +352,8 @@ defmodule BughouseWeb.LobbyLive do
                   game={@game}
                   players={@players}
                   my_position={@my_position}
+                  available_bots={@available_bots}
+                  bot_player_ids={@bot_player_ids}
                 />
                 <.player_seat
                   position={:board_2_black}
@@ -272,6 +362,8 @@ defmodule BughouseWeb.LobbyLive do
                   game={@game}
                   players={@players}
                   my_position={@my_position}
+                  available_bots={@available_bots}
+                  bot_player_ids={@bot_player_ids}
                 />
               </div>
               <div class="text-xs font-semibold text-center mt-2 opacity-50">Team 1</div>
@@ -330,32 +422,95 @@ defmodule BughouseWeb.LobbyLive do
     ~H"""
     <div class="w-full">
       <div class="bg-base-300 rounded-lg p-3 border-2 border-base-content/10">
-        <div class="flex items-center justify-between gap-3">
+        <div class="text-xs font-semibold opacity-60 mb-1">
+          {@color} · Board {@board}
+        </div>
+
+        <% player_id = Map.get(@game, :"#{@position}_id") %>
+        <% is_occupied = position_occupied?(@game, @position) %>
+        <% is_bot = is_occupied && bot_player?(@bot_player_ids, player_id) %>
+
+        <div class="flex items-center justify-between gap-2">
+          <!-- left: name or "Open Seat" -->
           <div class="flex-1 min-w-0">
-            <div class="text-xs font-semibold opacity-60 mb-1">
-              {@color} · Board {@board}
-            </div>
-            <%= if position_occupied?(@game, @position) do %>
+            <%= if is_occupied do %>
               <div class="flex items-center gap-2">
+                <%= if is_bot do %>
+                  <span class="badge badge-accent badge-sm">🤖</span>
+                <% end %>
                 <%= if @position == @my_position do %>
                   <span class="badge badge-primary badge-sm">You</span>
                 <% end %>
                 <span class="font-bold truncate">
-                  {get_player_name(@players, Map.get(@game, :"#{@position}_id"))}
+                  {get_player_name(@players, player_id)}
                 </span>
+                <%= if is_bot && is_dual_bot?(@game, @position, player_id) do %>
+                  <span class="badge badge-sm badge-outline">Dual</span>
+                <% end %>
               </div>
             <% else %>
               <span class="text-base-content/50 text-sm">Open Seat</span>
             <% end %>
           </div>
-          <%= if !position_occupied?(@game, @position) and @my_position == nil and @game.status == :waiting do %>
+          
+    <!-- right: action buttons -->
+          <%= if is_bot && @game.status == :waiting do %>
             <button
-              class="btn btn-sm btn-primary"
-              phx-click="join_position"
-              phx-value-position={@position}
+              class="btn btn-xs btn-ghost btn-error"
+              phx-click="remove_bot"
+              phx-value-player_id={player_id}
             >
-              Sit Here
+              ✕
             </button>
+          <% end %>
+
+          <%= if !is_occupied && @game.status == :waiting do %>
+            <div class="flex gap-1">
+              <%= if @my_position == nil do %>
+                <button
+                  class="btn btn-sm btn-primary"
+                  phx-click="join_position"
+                  phx-value-position={@position}
+                >
+                  Sit Here
+                </button>
+              <% end %>
+
+              <% filtered_bots = filter_bots_for_position(@game, @position, @available_bots) %>
+              <div class="dropdown dropdown-top">
+                <label tabindex="0" class="btn btn-sm btn-outline">
+                  Add Bot ▾
+                </label>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content menu bg-base-200 rounded-lg p-2 w-56 shadow z-10"
+                >
+                  <%= if Enum.empty?(filtered_bots) do %>
+                    <li>
+                      <span class="px-2 py-1 text-sm opacity-50">No bots available</span>
+                    </li>
+                  <% else %>
+                    <%= for {bot, mode} <- filtered_bots do %>
+                      <li>
+                        <button
+                          class="w-full text-left px-2 py-1 text-sm hover:bg-base-300 rounded"
+                          phx-click="add_bot"
+                          phx-value-bot_player_id={bot.player.id}
+                          phx-value-position={@position}
+                          phx-value-mode={mode}
+                        >
+                          <%= if mode == "dual" do %>
+                            Fill Team: {bot.player.display_name}
+                          <% else %>
+                            {bot.player.display_name}
+                          <% end %>
+                        </button>
+                      </li>
+                    <% end %>
+                  <% end %>
+                </ul>
+              </div>
+            </div>
           <% end %>
         </div>
       </div>

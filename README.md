@@ -131,21 +131,34 @@ This creates a unique dynamic where players must balance their own game while co
   - Tournament brackets
   - Different chess variants (future)
 
-### Phase 4: AI Integration (Reach Goal)
-**Status:** Research
+### Phase 4: Bot Players & Engine Ecosystem
+**Status:** In Planning — see [BUGHOUSE_ENGINE_INTEGRATION.md](./BUGHOUSE_ENGINE_INTEGRATION.md) for full design doc
 
-- [ ] **Rust-Based Chess AI**
-  - Standalone Rust engine for move calculation
-  - Minimax or Monte Carlo Tree Search algorithm
-  - Bughouse-specific evaluation heuristics
-  - Time management (faster moves when low on time)
-  - Multiple difficulty levels (Easy/Medium/Hard)
+- [x] **Bot Registry & Lobby Integration**
+  - [x] Bot schema: `players.is_bot` flag + `bots` table (type, health_url, supported_modes, per-mode ratings)
+  - [x] Lobby UI: add/remove single and dual bots from open seats via inline dropdown
+  - [ ] Health check system — external bots must be alive to join a game
+  - [ ] Bot adapter wiring (connects lobby placement to BUP engine process)
 
-- [ ] **AI Integration**
-  - Fill empty lobby slots with AI
-  - Choose AI difficulty before game starts
-  - AI plays believably (slight delay on moves)
-  - Track stats vs AI opponents separately
+- [ ] **BUP — Bughouse Universal Protocol**
+  - Standardized stdin/stdout protocol for bughouse engines (modeled after UCI)
+  - Supports two-board state, four clocks, reserves, and teammate piece requests
+  - Language- and transport-agnostic: any engine that speaks BUP can connect
+  - External bots connect via Phoenix Channel; internal bots via Erlang Port
+
+- [ ] **Rust-Based Bughouse Engine**
+  - Standalone Rust binary speaking BUP
+  - Legal move generation (all pieces + drops)
+  - Iterative deepening with alpha-beta pruning
+  - Bughouse-specific scoring: reserves, drop threats, clock pressure, cross-board awareness
+  - Parallel root search with Rayon
+  - Piece request / teammate coordination signaling
+
+- [ ] **Bot Ecosystem**
+  - Bot-only games (all 4 positions are engines)
+  - Separate bot rankings with Elo
+  - Configurable difficulty tiers
+  - External bot developer documentation
 
 ---
 
@@ -171,8 +184,8 @@ This creates a unique dynamic where players must balance their own game while co
 - **GitHub Actions** - CI/CD pipeline
 - **Domain** - Custom domain with SSL
 
-**Future/Optional:**
-- **Rust** - Chess AI engine
+**Planned:**
+- **Rust** - Bughouse engine (BUP protocol, parallel search via Rayon) — see [BUGHOUSE_ENGINE_INTEGRATION.md](./BUGHOUSE_ENGINE_INTEGRATION.md)
 - **Sentry/AppSignal** - Error monitoring
 - **Redis** - Caching layer (if needed at scale)
 
@@ -206,6 +219,11 @@ This creates a unique dynamic where players must balance their own game while co
 **Write-Once at Game Completion:**
 - Game state managed in-memory during active gameplay (LiveView/GenServer)
 - Chess logic handled by binbo-bughouse fork
+  - Produces spec-compliant **BFEN** (see [BFEN.md](./BFEN.md)):
+    - Reserves in single-bracket format `[QRBNPqrbnp]`; empty reserves emit `[]`
+    - Promoted pieces marked with `~` suffix in position string (e.g. `Q~`)
+    - Parser accepts both single-bracket and legacy two-bracket reserve formats
+    - Full FEN round-trip fidelity (emit → parse → emit is identity)
 - **Single database transaction at game end** writes:
   - Final game state (boards, moves, result)
   - Player rating updates
@@ -258,9 +276,6 @@ This creates a unique dynamic where players must balance their own game while co
 - id (uuid)
 - game_id (uuid, references games)
 - player_id (uuid, references players)
-- position (string) - "board_1_white", "board_1_black", etc.
-- color (string) - "white" or "black"
-- board (integer) - 1 or 2
 - rating_before (integer)
 - rating_after (integer)
 - rating_change (integer)
@@ -268,6 +283,10 @@ This creates a unique dynamic where players must balance their own game while co
 - outcome (enum: win, loss, draw, incomplete)
 - created_at (timestamp)
 ```
+> **Note:** Position, color, and board are not stored here — they are derived from the
+> `games` table (`board_1_white_id`, etc.) where needed. This keeps `game_players` as a
+> pure participation + rating record: exactly one row per player per game, regardless of
+> whether the player is human or a dual-position bot.
 
 **Friendship:**
 ```elixir
@@ -987,7 +1006,10 @@ This project is licensed under the MIT License - see LICENSE file for details.
 - [ ] Tournament system
 
 ### Q4 2026 / 2027
-- [ ] AI opponent (Rust integration)
+- [ ] Bot registry + lobby integration (Phase 4A)
+- [ ] BUP protocol + Rust engine first cut (Phase 4B-C)
+- [ ] Engine heuristics iteration (Phase 4D)
+- [ ] Bot-only games + rankings (Phase 4E)
 - [ ] Advanced features (voice chat, etc.)
 
 ---

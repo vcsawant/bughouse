@@ -158,11 +158,31 @@ defmodule Bughouse.Games do
   Get winrate by color.
   """
   def get_color_stats(player_id) do
+    # Color is derived from the game's position assignments: a player played white
+    # if they hold board_1_white or board_2_white in that game.
+    # Note: dual-position bots play both colors in one game — this stat is for
+    # human players only and will exclude bots when is_bot is added to players.
     from(gp in GamePlayer,
+      join: g in Game,
+      on: gp.game_id == g.id,
       where: gp.player_id == ^player_id and gp.outcome != :incomplete,
-      group_by: gp.color,
+      group_by:
+        fragment(
+          "CASE WHEN ? = ? OR ? = ? THEN 'white' ELSE 'black' END",
+          g.board_1_white_id,
+          ^player_id,
+          g.board_2_white_id,
+          ^player_id
+        ),
       select: %{
-        color: gp.color,
+        color:
+          fragment(
+            "CASE WHEN ? = ? OR ? = ? THEN 'white' ELSE 'black' END",
+            g.board_1_white_id,
+            ^player_id,
+            g.board_2_white_id,
+            ^player_id
+          ),
         total: count(gp.id),
         wins: filter(count(gp.id), gp.won == true)
       }
@@ -338,6 +358,53 @@ defmodule Bughouse.Games do
   end
 
   @doc """
+  Fills both seats of a team with a single dual-mode bot in one transaction.
+  `team` is `:team_1` or `:team_2`.
+
+  Team 1 = board_1_white + board_2_black
+  Team 2 = board_1_black + board_2_white
+
+  Intentionally skips the player_in_game? guard — a dual bot legitimately
+  occupies two seats.
+  """
+  def join_game_as_dual_bot(game_id, player_id, team) do
+    {pos_a, pos_b} = team_positions(team)
+
+    Repo.transaction(fn ->
+      game =
+        from(g in Game, where: g.id == ^game_id, lock: "FOR UPDATE")
+        |> Repo.one()
+
+      cond do
+        is_nil(game) ->
+          Repo.rollback(:game_not_found)
+
+        game.status != :waiting ->
+          Repo.rollback(:game_already_started)
+
+        Map.get(game, :"#{pos_a}_id") != nil ->
+          Repo.rollback(:position_taken)
+
+        Map.get(game, :"#{pos_b}_id") != nil ->
+          Repo.rollback(:position_taken)
+
+        true ->
+          game
+          |> Game.changeset(%{:"#{pos_a}_id" => player_id, :"#{pos_b}_id" => player_id})
+          |> Repo.update!()
+      end
+    end)
+    |> case do
+      {:ok, game} ->
+        broadcast_game_update(game, :player_joined)
+        {:ok, game}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
   Starts a game (transitions from :waiting to :in_progress).
 
   Only works if all 4 positions are filled and game is in :waiting status.
@@ -443,6 +510,44 @@ defmodule Bughouse.Games do
   end
 
   @doc """
+  Removes a player from ALL positions in a game.
+  Intended for bot removal where a dual bot occupies two seats.
+  """
+  def leave_game_all_positions(game_id, player_id) do
+    Repo.transaction(fn ->
+      game =
+        from(g in Game, where: g.id == ^game_id, lock: "FOR UPDATE")
+        |> Repo.one()
+
+      cond do
+        is_nil(game) ->
+          Repo.rollback(:game_not_found)
+
+        game.status != :waiting ->
+          Repo.rollback(:cannot_leave)
+
+        true ->
+          attrs =
+            [:board_1_white_id, :board_1_black_id, :board_2_white_id, :board_2_black_id]
+            |> Enum.filter(fn field -> Map.get(game, field) == player_id end)
+            |> Map.new(&{&1, nil})
+
+          game
+          |> Game.changeset(attrs)
+          |> Repo.update!()
+      end
+    end)
+    |> case do
+      {:ok, game} ->
+        broadcast_game_update(game, :player_left)
+        {:ok, game}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
   Gets a game with player names loaded.
 
   Returns a tuple of `{game, players_map}` where `players_map` is a map
@@ -504,6 +609,9 @@ defmodule Bughouse.Games do
       game.board_2_white_id == player_id or
       game.board_2_black_id == player_id
   end
+
+  defp team_positions(:team_1), do: {:board_1_white, :board_2_black}
+  defp team_positions(:team_2), do: {:board_1_black, :board_2_white}
 
   defp game_full?(%Game{} = game) do
     not is_nil(game.board_1_white_id) and

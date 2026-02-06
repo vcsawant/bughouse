@@ -745,9 +745,6 @@ defmodule Bughouse.Games.BughouseGameServer do
         player_id: state.board_1_white_id,
         outcome: team_1_outcome,
         won: team_1_outcome == :win,
-        position: "board_1_white",
-        color: "white",
-        board: 1,
         rating_before: 1200,
         rating_after: 1200,
         rating_change: 0
@@ -756,9 +753,6 @@ defmodule Bughouse.Games.BughouseGameServer do
         player_id: state.board_1_black_id,
         outcome: team_2_outcome,
         won: team_2_outcome == :win,
-        position: "board_1_black",
-        color: "black",
-        board: 1,
         rating_before: 1200,
         rating_after: 1200,
         rating_change: 0
@@ -767,9 +761,6 @@ defmodule Bughouse.Games.BughouseGameServer do
         player_id: state.board_2_white_id,
         outcome: team_2_outcome,
         won: team_2_outcome == :win,
-        position: "board_2_white",
-        color: "white",
-        board: 2,
         rating_before: 1200,
         rating_after: 1200,
         rating_change: 0
@@ -778,9 +769,6 @@ defmodule Bughouse.Games.BughouseGameServer do
         player_id: state.board_2_black_id,
         outcome: team_1_outcome,
         won: team_1_outcome == :win,
-        position: "board_2_black",
-        color: "black",
-        board: 2,
         rating_before: 1200,
         rating_after: 1200,
         rating_change: 0
@@ -855,6 +843,7 @@ defmodule Bughouse.Games.BughouseGameServer do
     fen
     |> String.split([" ", "["], parts: 2)
     |> List.first()
+    |> String.replace("~", "")
   end
 
   defp extract_piece_placement(fen), do: to_string(fen)

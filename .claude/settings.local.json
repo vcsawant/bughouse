@@ -38,7 +38,13 @@
       "Bash(mix clean:*)",
       "Bash(tree:*)",
       "Bash(npm run build)",
-      "Bash(mix run:*)"
+      "Bash(mix run:*)",
+      "Bash(xargs:*)",
+      "Bash(wc:*)",
+      "Bash(rebar3 ct:*)",
+      "Bash(git commit:*)",
+      "Bash(rustc:*)",
+      "Bash(cargo:*)"
     ]
   },
   "outputStyle": "Explanatory"
