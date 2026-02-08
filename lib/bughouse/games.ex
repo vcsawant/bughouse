@@ -4,9 +4,12 @@ defmodule Bughouse.Games do
   """
 
   import Ecto.Query, warn: false
+  require Logger
+
   alias Bughouse.Repo
   alias Bughouse.Schemas.Games.{Game, GamePlayer}
   alias Bughouse.Accounts
+  alias Bughouse.BotEngine
 
   @topic_prefix "game:"
 
@@ -433,6 +436,14 @@ defmodule Bughouse.Games do
           Repo.rollback(:not_enough_players)
 
         true ->
+          # Check bot limit before starting
+          bot_positions = get_bot_positions(game)
+          engines_needed = length(bot_positions)
+
+          if engines_needed > 0 and engines_needed > BotEngine.Supervisor.available_slots() do
+            Repo.rollback(:bot_limit_reached)
+          end
+
           game
           |> Game.changeset(%{status: :in_progress})
           |> Repo.update!()
@@ -443,11 +454,12 @@ defmodule Bughouse.Games do
         # Start the game server
         case start_game_server(game.id) do
           {:ok, pid} ->
+            # Start bot engines (if any bots are playing)
+            start_bot_engines(game)
             broadcast_game_update(game, :game_started)
             {:ok, game, pid}
 
           {:error, reason} ->
-            require Logger
             Logger.error("Failed to start game server: #{inspect(reason)}")
             {:error, :server_start_failed}
         end
@@ -656,18 +668,18 @@ defmodule Bughouse.Games do
   @doc """
   Makes a move on a running game.
   """
-  def make_game_move(game_id, player_id, move_notation) do
+  def make_game_move(game_id, player_id, move_notation, position \\ nil) do
     with {:ok, pid} <- get_game_server(game_id) do
-      Bughouse.Games.BughouseGameServer.make_move(pid, player_id, move_notation)
+      Bughouse.Games.BughouseGameServer.make_move(pid, player_id, move_notation, position)
     end
   end
 
   @doc """
   Drops a piece from reserves.
   """
-  def drop_game_piece(game_id, player_id, piece_type, square) do
+  def drop_game_piece(game_id, player_id, piece_type, square, position \\ nil) do
     with {:ok, pid} <- get_game_server(game_id) do
-      Bughouse.Games.BughouseGameServer.drop_piece(pid, player_id, piece_type, square)
+      Bughouse.Games.BughouseGameServer.drop_piece(pid, player_id, piece_type, square, position)
     end
   end
 
@@ -691,10 +703,21 @@ defmodule Bughouse.Games do
 
   @doc """
   Gets the current game state from the game server.
+  Used for the game live view so it needs only display relevant state.
   """
   def get_game_state(game_id) do
     with {:ok, pid} <- get_game_server(game_id) do
       Bughouse.Games.BughouseGameServer.get_state(pid)
+    end
+  end
+
+  @doc """
+  Gets raw BFEN strings and current clocks from the game server.
+  Used by BotEngineServer to feed positions to the Rust engine.
+  """
+  def get_bfen(game_id) do
+    with {:ok, pid} <- get_game_server(game_id) do
+      Bughouse.Games.BughouseGameServer.get_bfen(pid)
     end
   end
 
@@ -712,4 +735,62 @@ defmodule Bughouse.Games do
     :crypto.strong_rand_bytes(4)
     |> Base.encode16()
   end
+
+  ## Bot Engine Helpers
+
+  @doc false
+  # Returns a list of {bot_player_id, [position_atoms]} for each distinct bot in the game.
+  defp get_bot_positions(game) do
+    # Collect all player_id → position mappings
+    position_map = [
+      {game.board_1_white_id, :board_1_white},
+      {game.board_1_black_id, :board_1_black},
+      {game.board_2_white_id, :board_2_white},
+      {game.board_2_black_id, :board_2_black}
+    ]
+
+    # Get unique player IDs (a dual bot occupies two seats with same ID)
+    unique_ids =
+      position_map
+      |> Enum.map(&elem(&1, 0))
+      |> Enum.filter(&(&1 != nil))
+      |> Enum.uniq()
+
+    # Check which are bots
+    bot_ids =
+      from(p in Bughouse.Schemas.Accounts.Player,
+        where: p.id in ^unique_ids and p.is_bot == true,
+        select: p.id
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
+    # Build {bot_id, [positions]} for each bot
+    position_map
+    |> Enum.filter(fn {player_id, _pos} -> MapSet.member?(bot_ids, player_id) end)
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+    |> Enum.to_list()
+  end
+
+  defp start_bot_engines(game) do
+    bot_positions = get_bot_positions(game)
+
+    Enum.each(bot_positions, fn {bot_player_id, positions} ->
+      case BotEngine.Supervisor.start_engine(
+             game.id,
+             game.invite_code,
+             bot_player_id,
+             positions
+           ) do
+        {:ok, _pid} ->
+          Logger.info("Started bot engine for #{bot_player_id} in game #{game.invite_code}")
+
+        {:error, reason} ->
+          Logger.error(
+            "Failed to start bot engine for #{bot_player_id}: #{inspect(reason)}"
+          )
+      end
+    end)
+  end
+
 end

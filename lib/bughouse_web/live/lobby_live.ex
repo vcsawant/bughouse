@@ -136,6 +136,14 @@ defmodule BughouseWeb.LobbyLive do
       {:error, :not_enough_players} ->
         {:noreply, put_flash(socket, :error, "Need 4 players to start")}
 
+      {:error, :bot_limit_reached} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Cannot start game: bot engine limit reached. Remove bots or try again later."
+         )}
+
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to start: #{reason}")}
     end

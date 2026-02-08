@@ -41,3 +41,6 @@ npm-debug.log
 # Environment variables (contains secrets)
 .env
 
+# Bot engine game logs
+/priv/logs/
+

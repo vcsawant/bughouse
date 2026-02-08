@@ -62,18 +62,24 @@ defmodule Bughouse.Games.BughouseGameServer do
 
   @doc """
   Makes a move on the game.
+
+  An optional `position` atom (e.g. `:board_2_white`) can be passed to
+  disambiguate which board the move is for — required for dual bots that
+  occupy two seats with the same player_id.
   """
-  @spec make_move(pid(), binary(), String.t()) :: :ok | {:error, atom()}
-  def make_move(pid, player_id, move_notation) do
-    GenServer.call(pid, {:make_move, player_id, move_notation})
+  @spec make_move(pid(), binary(), String.t(), atom() | nil) :: :ok | {:error, atom()}
+  def make_move(pid, player_id, move_notation, position \\ nil) do
+    GenServer.call(pid, {:make_move, player_id, move_notation, position})
   end
 
   @doc """
   Drops a piece from reserves.
+
+  An optional `position` atom can be passed to disambiguate for dual bots.
   """
-  @spec drop_piece(pid(), binary(), atom(), String.t()) :: :ok | {:error, atom()}
-  def drop_piece(pid, player_id, piece_type, square) do
-    GenServer.call(pid, {:drop_piece, player_id, piece_type, square})
+  @spec drop_piece(pid(), binary(), atom(), String.t(), atom() | nil) :: :ok | {:error, atom()}
+  def drop_piece(pid, player_id, piece_type, square, position \\ nil) do
+    GenServer.call(pid, {:drop_piece, player_id, piece_type, square, position})
   end
 
   @doc """
@@ -107,6 +113,17 @@ defmodule Bughouse.Games.BughouseGameServer do
   @spec get_state(pid()) :: {:ok, map()}
   def get_state(pid) do
     GenServer.call(pid, :get_state)
+  end
+
+  @doc """
+  Gets raw BFEN strings and current clock values for the bot engine.
+
+  Returns `{:ok, board_1_bfen, board_2_bfen, clocks}` where BFENs include
+  reserves in `[...]` brackets — exactly what the Rust engine expects.
+  """
+  @spec get_bfen(pid()) :: {:ok, binary(), binary(), map()}
+  def get_bfen(pid) do
+    GenServer.call(pid, :get_bfen)
   end
 
   @doc """
@@ -199,11 +216,11 @@ defmodule Bughouse.Games.BughouseGameServer do
   end
 
   @impl true
-  def handle_call({:make_move, player_id, move_notation}, _from, state) do
+  def handle_call({:make_move, player_id, move_notation, position_hint}, _from, state) do
     if state.result != nil do
       {:reply, {:error, :game_over}, state}
     else
-      position = get_player_position(state, player_id)
+      position = resolve_player_position(state, player_id, position_hint)
 
       # Validate it's the player's turn
       if position == nil or not MapSet.member?(state.active_clocks, position) do
@@ -262,11 +279,11 @@ defmodule Bughouse.Games.BughouseGameServer do
   end
 
   @impl true
-  def handle_call({:drop_piece, player_id, piece_type, square}, _from, state) do
+  def handle_call({:drop_piece, player_id, piece_type, square, position_hint}, _from, state) do
     if state.result != nil do
       {:reply, {:error, :game_over}, state}
     else
-      position = get_player_position(state, player_id)
+      position = resolve_player_position(state, player_id, position_hint)
 
       if position == nil or not MapSet.member?(state.active_clocks, position) do
         {:reply, {:error, :not_your_turn}, state}
@@ -399,6 +416,15 @@ defmodule Bughouse.Games.BughouseGameServer do
   end
 
   @impl true
+  def handle_call(:get_bfen, _from, state) do
+    {:ok, board_1_bfen} = :binbo_bughouse.get_fen(state.board_1_pid)
+    {:ok, board_2_bfen} = :binbo_bughouse.get_fen(state.board_2_pid)
+    now = System.monotonic_time(:millisecond)
+    clocks = calculate_current_clocks(state, now)
+    {:reply, {:ok, to_string(board_1_bfen), to_string(board_2_bfen), clocks}, state}
+  end
+
+  @impl true
   def handle_info({:timeout, position}, state) do
     # Check if this timeout is still valid (clock still active)
     if MapSet.member?(state.active_clocks, position) do
@@ -456,6 +482,22 @@ defmodule Bughouse.Games.BughouseGameServer do
     5 * 60 * 1000
   end
 
+  # When a position hint is given (e.g. from dual bots), validate that the
+  # player actually owns that position, then use it directly.
+  defp resolve_player_position(state, player_id, position_hint)
+       when position_hint != nil do
+    if player_at_position(state, position_hint) == player_id do
+      position_hint
+    else
+      nil
+    end
+  end
+
+  # No hint — fall back to first-match lookup (fine for single-seat players).
+  defp resolve_player_position(state, player_id, nil) do
+    get_player_position(state, player_id)
+  end
+
   defp get_player_position(state, player_id) do
     cond do
       state.board_1_white_id == player_id -> :board_1_white
@@ -465,6 +507,12 @@ defmodule Bughouse.Games.BughouseGameServer do
       true -> nil
     end
   end
+
+  defp player_at_position(state, :board_1_white), do: state.board_1_white_id
+  defp player_at_position(state, :board_1_black), do: state.board_1_black_id
+  defp player_at_position(state, :board_2_white), do: state.board_2_white_id
+  defp player_at_position(state, :board_2_black), do: state.board_2_black_id
+  defp player_at_position(_state, _), do: nil
 
   defp get_board_for_position(state, position)
        when position in [:board_1_white, :board_1_black] do

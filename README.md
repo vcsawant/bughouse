@@ -132,27 +132,30 @@ This creates a unique dynamic where players must balance their own game while co
   - Different chess variants (future)
 
 ### Phase 4: Bot Players & Engine Ecosystem
-**Status:** In Planning — see [BUGHOUSE_ENGINE_INTEGRATION.md](./BUGHOUSE_ENGINE_INTEGRATION.md) for full design doc
+**Status:** Core integration complete — see [BUGHOUSE_ENGINE_INTEGRATION.md](./BUGHOUSE_ENGINE_INTEGRATION.md) for full design doc
 
 - [x] **Bot Registry & Lobby Integration**
   - [x] Bot schema: `players.is_bot` flag + `bots` table (type, health_url, supported_modes, per-mode ratings)
   - [x] Lobby UI: add/remove single and dual bots from open seats via inline dropdown
+  - [x] Dynamic Port integration: bots get their own OS process per game, managed by DynamicSupervisor
+  - [x] Configurable concurrency limit (default: 2 concurrent bot engines)
+  - [x] Hard fail: game refuses to start if bot engine limit would be exceeded
   - [ ] Health check system — external bots must be alive to join a game
-  - [ ] Bot adapter wiring (connects lobby placement to BUP engine process)
 
-- [ ] **BUP — Bughouse Universal Protocol**
-  - Standardized stdin/stdout protocol for bughouse engines (modeled after UCI)
-  - Supports two-board state, four clocks, reserves, and teammate piece requests
-  - Language- and transport-agnostic: any engine that speaks BUP can connect
-  - External bots connect via Phoenix Channel; internal bots via Erlang Port
+- [x] **BUP — Bughouse Universal Protocol**
+  - [x] Standardized stdin/stdout protocol for bughouse engines (modeled after UCI)
+  - [x] Supports two-board state, four clocks, reserves via BFEN
+  - [x] Internal bots connect via Erlang Port (BotEngineServer GenServer)
+  - [ ] External bots connect via Phoenix Channel (future)
+  - [ ] Teammate piece request signaling via `teammsg` / `partnermsg`
 
-- [ ] **Rust-Based Bughouse Engine**
-  - Standalone Rust binary speaking BUP
-  - Legal move generation (all pieces + drops)
-  - Iterative deepening with alpha-beta pruning
-  - Bughouse-specific scoring: reserves, drop threats, clock pressure, cross-board awareness
-  - Parallel root search with Rayon
-  - Piece request / teammate coordination signaling
+- [x] **Rust-Based Bughouse Engine (Phase B — Random Move Bot)**
+  - [x] Move generation library ([bughouse-chess](../bughouse-chess/)) — bitboard-based, BFEN parsing, reserves, drops, promoted-piece tracking
+  - [x] Engine binary ([bughouse-engine](../bughouse-engine/)) — BUP protocol, random move selection, 46 unit tests
+  - [ ] Iterative deepening with alpha-beta pruning (Phase D)
+  - [ ] Bughouse-specific scoring: reserves, drop threats, clock pressure (Phase C-E)
+  - [ ] Parallel root search with Rayon
+  - [ ] Piece request / teammate coordination signaling
 
 - [ ] **Bot Ecosystem**
   - Bot-only games (all 4 positions are engines)
@@ -184,8 +187,11 @@ This creates a unique dynamic where players must balance their own game while co
 - **GitHub Actions** - CI/CD pipeline
 - **Domain** - Custom domain with SSL
 
+**Bot Engine:**
+- **Rust** - [bughouse-engine](../bughouse-engine/) binary speaking BUP protocol via Erlang Port — see [BUGHOUSE_ENGINE_INTEGRATION.md](./BUGHOUSE_ENGINE_INTEGRATION.md)
+- **[bughouse-chess](../bughouse-chess/)** - Rust move generation library (bitboard-based, BFEN, reserves, drops)
+
 **Planned:**
-- **Rust** - Bughouse engine (BUP protocol, parallel search via Rayon) — see [BUGHOUSE_ENGINE_INTEGRATION.md](./BUGHOUSE_ENGINE_INTEGRATION.md)
 - **Sentry/AppSignal** - Error monitoring
 - **Redis** - Caching layer (if needed at scale)
 
@@ -648,6 +654,42 @@ config :bughouse, Bughouse.Repo,
   database: "bughouse_dev"
 ```
 
+### Bot Engine Setup
+
+The Rust-based bughouse engine runs as an Erlang Port — each bot in a game gets its own OS process.
+
+**Prerequisites:**
+- Rust toolchain (`rustup` — see [bughouse-engine README](../bughouse-engine/README.md))
+
+**Build the engine:**
+```bash
+cd ../bughouse-engine
+cargo build          # debug build (for development)
+cargo build --release  # release build (for production)
+```
+
+**Configuration:**
+
+| Environment | Config file | Engine path |
+|------------|-------------|-------------|
+| Dev | `config/dev.exs` | `../bughouse-engine/target/debug/bughouse_engine` |
+| Prod | `config/runtime.exs` | `$BUGHOUSE_ENGINE_PATH` or `/app/bin/bughouse_engine` |
+
+```elixir
+# config/config.exs — shared defaults
+config :bughouse, :bot_engine,
+  max_concurrent: 2  # max simultaneous bot engine processes
+```
+
+The engine binary path is resolved at boot time. In dev, it points to the debug build in the sibling workspace. In production, set the `BUGHOUSE_ENGINE_PATH` env var.
+
+**How it works:**
+1. Players add a bot to a team in the lobby
+2. When the game starts, `Games.start_game/1` detects bot players and checks the concurrency limit
+3. If under the limit, a `BotEngineServer` GenServer spawns per bot, opening an Erlang Port to the engine binary
+4. The BotEngineServer subscribes to game PubSub, sends BUP commands when it's the bot's turn, and plays the returned `bestmove` via the Games API
+5. When the game ends, the engine process exits cleanly
+
 ### Google OAuth Authentication Setup
 
 The application supports Google OAuth for user authentication. To enable this feature:
@@ -881,6 +923,9 @@ lib/
 │   ├── accounts/              # User management
 │   │   ├── user.ex
 │   │   └── user_token.ex
+│   ├── bot_engine/            # Bot engine integration
+│   │   ├── supervisor.ex      # DynamicSupervisor with concurrency limit
+│   │   └── server.ex          # GenServer: Port owner, BUP translator
 │   ├── games/                 # Game management
 │   │   ├── game.ex
 │   │   └── game_server.ex

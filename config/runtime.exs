@@ -23,6 +23,13 @@ end
 config :bughouse, BughouseWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# Bot engine path + log directory (runtime so env vars resolve on the deploy target, not build machine)
+if config_env() == :prod do
+  config :bughouse, :bot_engine,
+    engine_path: System.get_env("BUGHOUSE_ENGINE_PATH") || "/app/bin/bughouse_engine",
+    game_log_path: System.get_env("BUGHOUSE_ENGINE_LOG_PATH") || "/var/log/bughouse/engine"
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

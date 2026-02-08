@@ -11,6 +11,11 @@ config :bughouse,
   ecto_repos: [Bughouse.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+# Bot engine configuration
+config :bughouse, :bot_engine,
+  max_concurrent: 2,
+  game_log_path: nil
+
 # OAuth configuration
 config :bughouse, :oauth,
   google: [

@@ -134,6 +134,8 @@ From the game loop's perspective, the bot adapter simply calls `make_game_move` 
 
 BUP is modeled after UCI but extended for the dimensions that make bughouse unique: two boards, four clocks, reserves, and teammate coordination signals.
 
+> **Authoritative spec:** The full BUP v0.1 specification lives in [`bughouse-engine/docs/BUP.md`](../bughouse-engine/docs/BUP.md). This section is a summary for integration context. When in doubt, `BUP.md` wins.
+
 ### Why a Protocol?
 
 UCI's power is its simplicity. An engine is a black box: you give it a position, it gives you a move. The protocol is language-agnostic and transport-agnostic. BUP does the same for bughouse, which means:
@@ -142,121 +144,124 @@ UCI's power is its simplicity. An engine is a black box: you give it a position,
 - Engines can be hosted anywhere (same server, remote VPS, cloud function)
 - The protocol is the only contract between the platform and the engine
 
-### Protocol Specification
+### Protocol Summary
 
 Communication is line-based, newline-delimited, plain text. The server writes to the engine's stdin. The engine writes to the server's stdout. (For external bots over WebSocket, the same messages are sent as text frames.)
+
+Positions use **BFEN** (Bughouse FEN), which embeds reserves directly in the position string using bracket notation. See [`bughouse-engine/docs/BFEN.md`](../bughouse-engine/docs/BFEN.md) for the full spec.
 
 #### Server → Engine
 
 ```
-# ── Position Update ──────────────────────────────────────────
-# Sent before every "go" command. Contains full game state.
+# ── Handshake ─────────────────────────────────────────────────
+bup                                         # Engine must reply: id name/author, then bupok
+bupnewgame                                  # Clear state for a new game
+isready                                     # Engine must reply: readyok
+
+# ── Position (uses BFEN — reserves embedded in brackets) ──────
+# Reserves are part of the BFEN string, not separate fields.
+# The engine is position-agnostic — it doesn't know its color or team.
 #
-# Fields:
-#   fen1        FEN of board 1 (piece placement only, e.g. "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")
-#   fen2        FEN of board 2
-#   res_w       White team reserves (comma-separated piece chars, e.g. "p,p,n" or empty string)
-#   res_b       Black team reserves
-#   myboard     Which board this engine is playing on: 1 or 2
-#   mycolor     Which color: white or black
-#
-position fen1 <fen1> fen2 <fen2> res_w <pieces> res_b <pieces> myboard <1|2> mycolor <white|black>
+position board <A|B> bfen <bfenstring> [moves <move1> ... <moveN>]
+position board A startpos                   # Shorthand for starting position
+
+# ── Clock Times (all four, sent before "go") ──────────────────
+clock white_A <ms>
+clock black_A <ms>
+clock white_B <ms>
+clock black_B <ms>
 
 # ── Go (Think & Return a Move) ────────────────────────────────
-# Tells the engine to calculate and return a bestmove.
-# All times in milliseconds.
-#
-# Fields:
-#   mytime      Time remaining on the engine's own clock
-#   opptime     Time remaining on the opponent's clock (same board)
-#   tmtime      Time remaining on the teammate's clock
-#   otmtime     Time remaining on the opponent's teammate's clock
-#
-go mytime <ms> opptime <ms> tmtime <ms> otmtime <ms>
+go board <A|B> [movetime <ms>] [wtime <ms> btime <ms>] [depth <n>] [infinite]
 
 # ── Stop ──────────────────────────────────────────────────────
-# Tells the engine to stop thinking immediately and return
-# whatever bestmove it has so far. Used when the server needs
-# an urgent response (e.g. time is nearly up).
-#
-stop
+stop [board <A|B>]                          # Stop search (all or specific board)
 
-# ── Teammate Request ──────────────────────────────────────────
-# Signals that the teammate engine has requested a specific piece.
-# The engine should factor this into its scoring
-# (e.g. prefer capturing that piece type if possible).
-#
-# piece: p | n | b | r | q
-#
-teammate_wants <piece>
+# ── Team Messages (forwarded from partner engine) ─────────────
+partnermsg need <piece> [urgency <low|medium|high>]
+partnermsg stall [duration <moves>]
+partnermsg play_fast [reason <time|pressure>]
+partnermsg threat <low|medium|high|critical>
 
 # ── Quit ──────────────────────────────────────────────────────
-# Tells the engine to shut down cleanly.
-#
 quit
 ```
 
 #### Engine → Server
 
 ```
+# ── Identification (during handshake) ─────────────────────────
+id name <string>
+id author <string>
+bupok
+
 # ── Best Move ─────────────────────────────────────────────────
-# The engine's chosen move. Exactly one of these formats:
+#   Standard move:   e2e4
+#   Promotion:       e7e8q
+#   Drop:            p@e4
 #
-#   Standard move:   <from><to>          e.g. "e2e4"
-#   Promotion:       <from><to><piece>   e.g. "e7e8q"
-#   Drop:            <piece>@<square>    e.g. "p@c3"
-#
-bestmove <move>
+bestmove board <A|B> <move> [ponder <move>]
 
-# ── Piece Request ─────────────────────────────────────────────
-# Engine signals that it wants a specific piece from its teammate.
-# The teammate engine will receive a "teammate_wants" message.
-# This is advisory — the teammate is not obligated to comply.
-# The engine should not block waiting for it.
-#
-# piece: p | n | b | r | q
-#
-request <piece>
+# ── Team Messages (sent to partner via server) ────────────────
+teammsg need <piece> [urgency <low|medium|high>]
+teammsg stall [duration <moves>]
+teammsg threat <low|medium|high|critical>
+teammsg material <+/-><value>
 
-# ── Info (optional) ──────────────────────────────────────────
-# Debug/diagnostic output. The server logs this but does not act on it.
-# Fields are all optional and can appear in any order.
-#
-#   depth   Search depth reached
-#   nodes   Number of nodes searched
-#   score   Position score (centipawns, from engine's perspective; "mate N" for forced mate)
-#   time    Milliseconds spent thinking
-#
-info depth <n> nodes <n> score <cp|mate N> time <ms>
+# ── Info (optional diagnostic output) ─────────────────────────
+info board <A|B> depth <n> nodes <n> score cp <n> time <ms> [pv <moves>]
+
+# ── Ready ─────────────────────────────────────────────────────
+readyok
 ```
 
 ### Example Session
 
 ```
-# Server sends position and asks for a move:
-> position fen1 rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR fen2 rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR res_w  res_b  myboard 1 mycolor white
-> go mytime 600000 opptime 600000 tmtime 599800 otmtime 600000
+# Handshake
+> bup
+< id name BughouseBot 1.0
+< id author Viren
+< bupok
+
+> bupnewgame
+> isready
+< readyok
+
+# Server sets up both boards and clocks, then asks for a move:
+> position board A bfen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[] w KQkq - 0 1
+> position board B bfen rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR[] b KQkq - 0 1
+> clock white_A 600000
+> clock black_A 600000
+> clock white_B 599800
+> clock black_B 600000
+> go board A movetime 3000
 
 # Engine thinks, outputs info, then returns a move:
-< info depth 4 nodes 12400 score cp 30 time 850
-< bestmove e2e4
+< info board A depth 8 nodes 12400 score cp 30 time 850
+< bestmove board A e2e4
 
-# Later, teammate requests a knight:
-> teammate_wants n
+# Partner engine requests a knight:
+> partnermsg need n urgency medium
 
-# Server sends new position (teammate captured a pawn, it's now in our reserves):
-> position fen1 rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R fen2 rnbqkbnr/ppppp1pp/8/5p2/4P3/8/PPPP1PPP/RNBQKBNR res_w p res_b  myboard 1 mycolor white
-> go mytime 598500 opptime 599200 tmtime 598100 otmtime 598900
+# Teammate captured a pawn — reserves now in the BFEN brackets:
+> position board A bfen rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R[p] w KQkq - 2 3
+> position board B bfen rnbqkbnr/ppppp1pp/8/5p2/4P3/8/PPPP1PPP/RNBQKBNR[P] b KQkq - 0 2
+> clock white_A 598500
+> clock black_A 599200
+> clock white_B 598100
+> clock black_B 598900
+> go board A movetime 2500
 
-# Engine decides to drop the pawn (and also requests a bishop):
-< request b
-< info depth 3 nodes 8200 score cp 45 time 400
-< bestmove p@e5
+# Engine decides to drop the pawn (and signals it needs a bishop):
+< teammsg need b urgency high
+< info board A depth 6 nodes 8200 score cp 45 time 400
+< bestmove board A p@e5
 ```
 
 ### Dual-Control Mode
 
-When an engine controls both positions on a team, the server sends two independent `position` + `go` sequences — one for each board. The engine can maintain shared internal state to coordinate, but each `bestmove` response corresponds to exactly one board. The `request` / `teammate_wants` messages are suppressed in dual-control mode since coordination is internal.
+When an engine controls both positions on a team, the server sends two independent `position` + `go` sequences — one for each board. The engine can maintain shared internal state to coordinate, but each `bestmove` response corresponds to exactly one board. The `teammsg` / `partnermsg` messages are suppressed in dual-control mode since coordination is internal.
 
 ---
 
@@ -293,9 +298,9 @@ The adapter is a GenServer that:
 6. **Calls** `Games.make_game_move/3` or `Games.drop_game_piece/4`
 7. **Forwards** `request` messages to the teammate's adapter (if applicable)
 
-### State Translation: Game State → BUP Position
+### State Translation: Game State → BUP Commands
 
-The game state broadcast already contains everything BUP needs:
+The game state broadcast already contains everything BUP needs. The adapter converts it to BFEN-based `position` and `clock` commands:
 
 ```elixir
 # What the server broadcasts (from serialize_state_for_client/1):
@@ -312,14 +317,23 @@ The game state broadcast already contains everything BUP needs:
   }
 }
 
-# Translated to BUP:
-# position fen1 <board_1_fen> fen2 <board_2_fen> res_w <white_team_reserves> res_b <black_team_reserves> myboard <N> mycolor <color>
+# Adapter translates to BUP commands:
+#   1. Build BFEN for each board (embed reserves in brackets)
+#   2. Send position + clock commands
+#
+# position board A bfen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[<reserves>] w KQkq - 0 1
+# position board B bfen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[<reserves>] w KQkq - 0 1
+# clock white_A 600000
+# clock black_A 600000
+# clock white_B 600000
+# clock black_B 600000
+# go board A movetime 3000
 ```
 
-Note: BUP reserves are per-team (white team / black team), not per-position. The adapter aggregates the two positions' reserves into team totals before sending. Team mapping:
+Note: BFEN embeds reserves directly in the position string using bracket notation (e.g. `[QNPqp]`). Each board's BFEN carries the reserves for the players on that board. The adapter builds the BFEN reserve bracket from the per-position reserve maps. Team mapping for which reserves belong to which board:
 
-- **White team reserves** = `board_1_white` reserves + `board_2_black` reserves (Team 1)
-- **Black team reserves** = `board_1_black` reserves + `board_2_white` reserves (Team 2)
+- **Board A reserves** = `board_1_white` reserves (white side) + `board_1_black` reserves (black side)
+- **Board B reserves** = `board_2_white` reserves (white side) + `board_2_black` reserves (black side)
 
 ### Internal vs External Adapter
 
@@ -406,59 +420,65 @@ An opponent with three pawns in reserve can drop-check you repeatedly. A queen i
 ### Project Structure
 
 ```
-bughouse-engine/
-├── Cargo.toml
+bughouse-engine/                             # Engine binary (Rust)
+├── Cargo.toml                               # Depends on bughouse-chess
 ├── src/
-│   ├── main.rs                  # BUP protocol handler (stdin/stdout loop)
-│   ├── board.rs                 # Board representation + FEN parsing
-│   ├── moves.rs                 # Legal move generation
-│   ├── search.rs                # Minimax / alpha-beta search
-│   ├── scoring.rs               # Position scoring / evaluation function
-│   ├── bughouse.rs              # Bughouse-specific state (reserves, two boards, clocks)
-│   └── time.rs                  # Time management (how long to think)
+│   ├── main.rs                              # BUP protocol handler (stdin/stdout loop)
+│   ├── search.rs                            # Minimax / alpha-beta search
+│   ├── scoring.rs                           # Position scoring / evaluation function
+│   └── time.rs                              # Time management (how long to think)
 ├── tests/
-│   ├── move_gen_tests.rs        # Exhaustive legal move generation tests
-│   ├── scoring_tests.rs         # Scoring function sanity checks
-│   └── protocol_tests.rs        # BUP parse/format tests
+│   ├── scoring_tests.rs                     # Scoring function sanity checks
+│   └── protocol_tests.rs                    # BUP parse/format tests
 └── benches/
-    └── search_bench.rs          # Benchmark search speed at various depths
+    └── search_bench.rs                      # Benchmark search speed at various depths
+
+bughouse-chess/                              # Move generation library (Rust)
+├── src/
+│   ├── lib.rs                               # Public API
+│   ├── board.rs                             # Bitboard board state + reserves + promoted tracking
+│   ├── board_builder.rs                     # BFEN parsing and emission
+│   ├── reserve.rs                           # Piece reserve type (drop tracking)
+│   ├── bughouse_move.rs                     # BughouseMove enum (Regular + Drop)
+│   ├── movegen/                             # Legal move generation (all pieces + drops)
+│   └── game.rs                              # Game history, draw detection
 ```
 
 ### Board Representation
 
-Start simple, optimize later. An 8x8 array of `Option<Piece>` is readable and correct. If performance becomes a bottleneck at deeper search depths, migrate to bitboards (one `u64` per piece type + color). The move generation and scoring code stays the same either way — only the board representation changes.
+Board representation and move generation are handled by the `bughouse-chess` library (forked from [jordanbray/chess](https://github.com/jordanbray/chess) and adapted for bughouse rules). This gives us:
+
+- **Bitboard-based** board state (~90 bytes, `Copy`-friendly)
+- **BFEN parsing** with `[reserves]` brackets and `~` promoted-piece markers
+- **Legal move generation** for all piece types + drops (no pin/check filtering per bughouse rules)
+- **Capture tracking** with promoted-piece demotion
+- **Zobrist hashing** that includes reserve state (for repetition detection)
+
+The engine depends on the library via:
+
+```toml
+# bughouse-engine/Cargo.toml
+[dependencies]
+bughouse-chess = { git = "https://github.com/vcsawant/bughouse-chess", branch = "main" }
+```
+
+The engine only needs to implement search, scoring, time management, and the BUP I/O loop — all board mechanics are delegated to the library.
 
 ```rust
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Color { White, Black }
+use bughouse_chess::*;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum PieceType { Pawn, Knight, Bishop, Rook, Queen, King }
+// Parse a BFEN position
+let board = Board::from_str("r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R[Np] w KQkq - 4 5").unwrap();
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct Piece {
-    piece_type: PieceType,
-    color: Color,
-}
+// Generate all legal moves
+let moves: Vec<ChessMove> = MoveGen::new_legal(&board).collect();
 
-#[derive(Clone, Debug)]
-struct Board {
-    squares: [[Option<Piece>; 8]; 8],
-    active_color: Color,
-    castling: CastlingRights,
-    en_passant: Option<Square>,  // (file, rank)
-}
+// Generate all drop moves from reserves
+let drops: Vec<BughouseMove> = MoveGen::drop_moves(&board);
 
-// Bughouse adds reserves to the board state:
-#[derive(Clone, Debug)]
-struct BughouseState {
-    board1: Board,
-    board2: Board,
-    reserves: TeamReserves,      // pieces available to drop, per team
-    clocks: [u64; 4],            // ms remaining: [b1_white, b1_black, b2_white, b2_black]
-    my_board: u8,                // 1 or 2
-    my_color: Color,
-}
+// Make a move and track captures (for routing to partner's reserves)
+let (new_board, capture) = board.make_move_with_capture(chosen_move);
+// capture: Option<(Piece, was_promoted)> — if was_promoted, piece demotes to pawn
 ```
 
 ### Parallel Search with Rayon

@@ -16,6 +16,8 @@ defmodule Bughouse.Application do
       {Registry, keys: :unique, name: Bughouse.Games.Registry},
       # Dynamic supervisor for game servers
       {DynamicSupervisor, name: Bughouse.Games.GameSupervisor, strategy: :one_for_one},
+      # Dynamic supervisor for bot engine processes (Erlang Ports)
+      Bughouse.BotEngine.Supervisor,
       # Start a worker by calling: Bughouse.Worker.start_link(arg)
       # {Bughouse.Worker, arg},
       # Start to serve requests, typically the last entry
