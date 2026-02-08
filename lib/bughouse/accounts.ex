@@ -86,6 +86,177 @@ defmodule Bughouse.Accounts do
   end
 
   @doc """
+  Gets the friend Player record from a Friendship, relative to the given player_id.
+  """
+  def friend_from_friendship(%Friendship{} = f, player_id) do
+    if f.player_id == player_id, do: f.friend, else: f.player
+  end
+
+  @doc """
+  Accepts a pending friendship request.
+  The player_id must be the *recipient* (friend_id) of the original request.
+  """
+  def accept_friendship(player_id, requester_id) do
+    query =
+      from(f in Friendship,
+        where:
+          f.player_id == ^requester_id and f.friend_id == ^player_id and f.status == :pending
+      )
+
+    case Repo.one(query) do
+      nil ->
+        {:error, :not_found}
+
+      friendship ->
+        friendship
+        |> Friendship.changeset(%{status: :accepted})
+        |> Repo.update()
+    end
+  end
+
+  @doc """
+  Rejects (deletes) a pending friendship request.
+  The player_id must be the *recipient* (friend_id) of the original request.
+  """
+  def reject_friendship(player_id, requester_id) do
+    query =
+      from(f in Friendship,
+        where:
+          f.player_id == ^requester_id and f.friend_id == ^player_id and f.status == :pending
+      )
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      friendship -> Repo.delete(friendship)
+    end
+  end
+
+  @doc """
+  Removes an accepted friendship (unfriend). Works regardless of who sent the original request.
+  """
+  def remove_friendship(player_id, friend_id) do
+    query =
+      from(f in Friendship,
+        where:
+          ((f.player_id == ^player_id and f.friend_id == ^friend_id) or
+             (f.player_id == ^friend_id and f.friend_id == ^player_id)) and
+            f.status == :accepted
+      )
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      friendship -> Repo.delete(friendship)
+    end
+  end
+
+  @doc """
+  Cancels a pending friend request that the player sent.
+  """
+  def cancel_friendship(player_id, friend_id) do
+    query =
+      from(f in Friendship,
+        where: f.player_id == ^player_id and f.friend_id == ^friend_id and f.status == :pending
+      )
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      friendship -> Repo.delete(friendship)
+    end
+  end
+
+  @doc """
+  Gets pending friend requests *received* by a player (incoming).
+  Preloads the requesting player.
+  """
+  def get_pending_requests(player_id) do
+    from(f in Friendship,
+      where: f.friend_id == ^player_id and f.status == :pending,
+      preload: [:player],
+      order_by: [desc: f.inserted_at]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets pending friend requests *sent* by a player (outgoing).
+  Preloads the target friend.
+  """
+  def get_sent_requests(player_id) do
+    from(f in Friendship,
+      where: f.player_id == ^player_id and f.status == :pending,
+      preload: [:friend],
+      order_by: [desc: f.inserted_at]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets accepted friends with game stats (total games, wins with, wins against).
+  """
+  def get_friends_with_stats(player_id) do
+    friendships = get_friends(player_id)
+
+    Enum.map(friendships, fn f ->
+      friend = friend_from_friendship(f, player_id)
+      stats = Bughouse.Games.get_friend_stats(player_id, friend.id)
+
+      %{
+        friend: friend,
+        total_games: stats.total_games,
+        wins_with: stats.wins_with,
+        wins_against: stats.wins_against
+      }
+    end)
+  end
+
+  @doc """
+  Searches for players matching a query string.
+  Excludes bots, guests, and the current player. Uses ilike on username and display_name.
+  """
+  def search_players(query, current_player_id) do
+    search = "%#{query}%"
+
+    from(p in Player,
+      where:
+        p.id != ^current_player_id and
+          p.is_bot == false and
+          p.guest == false and
+          (ilike(p.username, ^search) or ilike(p.display_name, ^search)),
+      limit: 10,
+      order_by: [asc: p.username]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns the friendship status between two players.
+  Returns :friends, :pending_sent, :pending_received, or :none.
+  """
+  def get_friendship_status(player_id, other_id) do
+    friendship =
+      from(f in Friendship,
+        where:
+          (f.player_id == ^player_id and f.friend_id == ^other_id) or
+            (f.player_id == ^other_id and f.friend_id == ^player_id)
+      )
+      |> Repo.one()
+
+    case friendship do
+      nil ->
+        :none
+
+      %Friendship{status: :accepted} ->
+        :friends
+
+      %Friendship{status: :pending, player_id: ^player_id} ->
+        :pending_sent
+
+      %Friendship{status: :pending} ->
+        :pending_received
+    end
+  end
+
+  @doc """
   Returns all bots currently marked online, with their player records preloaded.
   """
   def list_available_bots do

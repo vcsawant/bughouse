@@ -33,7 +33,10 @@ defmodule BughouseWeb.Router do
     post "/onboarding/username", OnboardingController, :create_username
 
     live_session :game,
-      on_mount: [{BughouseWeb.UserAuth, :ensure_guest_player}],
+      on_mount: [
+        {BughouseWeb.UserAuth, :ensure_guest_player},
+        {BughouseWeb.UserAuth, :subscribe_notifications}
+      ],
       layout: {BughouseWeb.Layouts, :app} do
       live "/lobby/:invite_code", LobbyLive
       live "/game/:invite_code", GameLive
@@ -44,7 +47,10 @@ defmodule BughouseWeb.Router do
 
     # Authenticated-only routes
     live_session :authenticated,
-      on_mount: [{BughouseWeb.UserAuth, :require_authenticated}],
+      on_mount: [
+        {BughouseWeb.UserAuth, :require_authenticated},
+        {BughouseWeb.UserAuth, :subscribe_notifications}
+      ],
       layout: {BughouseWeb.Layouts, :app} do
       live "/account", AccountLive
     end

@@ -11,10 +11,17 @@ defmodule BughouseWeb.PageController do
     render(conn, :new_game)
   end
 
-  def create_game(conn, _params) do
+  @valid_time_controls ~w(1min 2min 5min 10min)
+
+  def create_game(conn, params) do
     alias Bughouse.Games
 
-    case Games.create_game() do
+    time_control =
+      if params["time_control"] in @valid_time_controls,
+        do: params["time_control"],
+        else: "5min"
+
+    case Games.create_game(%{time_control: time_control}) do
       {:ok, game} ->
         redirect(conn, to: ~p"/lobby/#{game.invite_code}")
 

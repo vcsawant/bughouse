@@ -45,6 +45,68 @@
         </div>
 
         <.form for={%{}} action={~p"/game"} method="post">
+          <div class="mb-6">
+            <h3 class="font-semibold mb-3">Time Control</h3>
+            <input type="hidden" name="time_control" id="time-control-input" value="5min" />
+            <div
+              id="time-control-selector"
+              class="relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full w-fit"
+            >
+              <div
+                id="time-control-indicator"
+                class="absolute w-1/4 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 transition-[left] left-[50%]"
+              />
+              <button
+                type="button"
+                class="relative flex px-4 py-2 cursor-pointer w-1/4 justify-center text-sm font-medium opacity-75 hover:opacity-100 z-10"
+                data-value="1min"
+                onclick="selectTimeControl(this)"
+              >
+                1 min
+              </button>
+              <button
+                type="button"
+                class="relative flex px-4 py-2 cursor-pointer w-1/4 justify-center text-sm font-medium opacity-75 hover:opacity-100 z-10"
+                data-value="2min"
+                onclick="selectTimeControl(this)"
+              >
+                2 min
+              </button>
+              <button
+                type="button"
+                class="relative flex px-4 py-2 cursor-pointer w-1/4 justify-center text-sm font-medium opacity-100 z-10"
+                data-value="5min"
+                onclick="selectTimeControl(this)"
+              >
+                5 min
+              </button>
+              <button
+                type="button"
+                class="relative flex px-4 py-2 cursor-pointer w-1/4 justify-center text-sm font-medium opacity-75 hover:opacity-100 z-10"
+                data-value="10min"
+                onclick="selectTimeControl(this)"
+              >
+                10 min
+              </button>
+            </div>
+          </div>
+
+          <script>
+            function selectTimeControl(btn) {
+              // Update hidden input
+              document.getElementById("time-control-input").value = btn.dataset.value;
+
+              // Move indicator
+              var buttons = btn.parentElement.querySelectorAll("button");
+              var index = Array.prototype.indexOf.call(buttons, btn);
+              document.getElementById("time-control-indicator").style.left = (index * 25) + "%";
+
+              // Update opacity
+              buttons.forEach(function(b) { b.style.opacity = "0.75"; });
+              btn.style.opacity = "1";
+            }
+          </script>
+
           <div class="card-actions justify-end">
             <button type="submit" class="btn btn-primary btn-lg">
               Create Game

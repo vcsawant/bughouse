@@ -24,7 +24,7 @@ defmodule Bughouse.Games do
         %{
           invite_code: invite_code,
           status: :waiting,
-          time_control: "10min"
+          time_control: "5min"
         },
         attrs
       )
@@ -157,6 +157,64 @@ defmodule Bughouse.Games do
     )
     |> Repo.all()
     |> Map.new()
+  end
+
+  @doc """
+  Get friend stats distinguishing teammate vs opponent games.
+
+  Team 1 = board_1_white + board_2_black
+  Team 2 = board_1_black + board_2_white
+
+  Returns %{total_games: n, wins_with: n, wins_against: n}
+  """
+  def get_friend_stats(player_id, friend_id) do
+    # Find all completed games where both players participated
+    games =
+      from(gp1 in GamePlayer,
+        join: gp2 in GamePlayer,
+        on: gp1.game_id == gp2.game_id,
+        join: g in Game,
+        on: g.id == gp1.game_id,
+        where: gp1.player_id == ^player_id and gp2.player_id == ^friend_id,
+        where: gp1.outcome != :incomplete,
+        select: %{
+          won: gp1.won,
+          # Determine if they were on the same team
+          same_team:
+            fragment(
+              """
+              CASE
+                WHEN (? IN (?, ?) AND ? IN (?, ?)) THEN true
+                WHEN (? IN (?, ?) AND ? IN (?, ?)) THEN true
+                ELSE false
+              END
+              """,
+              type(^player_id, Ecto.UUID),
+              g.board_1_white_id,
+              g.board_2_black_id,
+              type(^friend_id, Ecto.UUID),
+              g.board_1_white_id,
+              g.board_2_black_id,
+              type(^player_id, Ecto.UUID),
+              g.board_1_black_id,
+              g.board_2_white_id,
+              type(^friend_id, Ecto.UUID),
+              g.board_1_black_id,
+              g.board_2_white_id
+            )
+        }
+      )
+      |> Repo.all()
+
+    total = length(games)
+
+    wins_with =
+      Enum.count(games, fn g -> g.same_team && g.won end)
+
+    wins_against =
+      Enum.count(games, fn g -> !g.same_team && g.won end)
+
+    %{total_games: total, wins_with: wins_with, wins_against: wins_against}
   end
 
   @doc """

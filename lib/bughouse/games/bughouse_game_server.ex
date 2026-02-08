@@ -489,6 +489,8 @@ defmodule Bughouse.Games.BughouseGameServer do
   end
 
   defp parse_time_control("1sec"), do: 1 * 1000
+  defp parse_time_control("1min"), do: 1 * 60 * 1000
+  defp parse_time_control("2min"), do: 2 * 60 * 1000
   defp parse_time_control("5min"), do: 5 * 60 * 1000
   defp parse_time_control("10min"), do: 10 * 60 * 1000
 

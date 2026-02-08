@@ -16,6 +16,11 @@ defmodule BughouseWeb.AccountLive do
     # Load rating history (default: all time)
     rating_history = Games.get_rating_history(player.id)
 
+    # Load friends data
+    friends_with_stats = Accounts.get_friends_with_stats(player.id)
+    pending_requests = Accounts.get_pending_requests(player.id)
+    sent_requests = Accounts.get_sent_requests(player.id)
+
     {:ok,
      socket
      |> assign(:player, player)
@@ -26,7 +31,12 @@ defmodule BughouseWeb.AccountLive do
      |> assign(:rating_history, rating_history)
      |> assign(:rating_period, :all)
      |> assign(:editing_display_name, false)
-     |> assign(:display_name_form, to_form(%{"display_name" => player.display_name}))}
+     |> assign(:display_name_form, to_form(%{"display_name" => player.display_name}))
+     |> assign(:friends_with_stats, friends_with_stats)
+     |> assign(:pending_requests, pending_requests)
+     |> assign(:sent_requests, sent_requests)
+     |> assign(:search_query, "")
+     |> assign(:search_results, [])}
   end
 
   @impl true
@@ -74,6 +84,73 @@ defmodule BughouseWeb.AccountLive do
      socket
      |> assign(:rating_period, period_atom)
      |> assign(:rating_history, rating_history)}
+  end
+
+  def handle_event("search_players", %{"query" => query}, socket) do
+    results =
+      if String.length(query) >= 2 do
+        Accounts.search_players(query, socket.assigns.player.id)
+      else
+        []
+      end
+
+    {:noreply,
+     socket
+     |> assign(:search_query, query)
+     |> assign(:search_results, results)}
+  end
+
+  def handle_event("accept_friend", %{"id" => requester_id}, socket) do
+    player = socket.assigns.player
+
+    case Accounts.accept_friendship(player.id, requester_id) do
+      {:ok, _} ->
+        requester = Accounts.get_player!(requester_id)
+        Bughouse.Notifications.send_friend_accepted(player, requester_id)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "You are now friends with #{requester.display_name}")
+         |> reload_friends_data()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not accept request")}
+    end
+  end
+
+  def handle_event("reject_friend", %{"id" => requester_id}, socket) do
+    case Accounts.reject_friendship(socket.assigns.player.id, requester_id) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Friend request declined")
+         |> reload_friends_data()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not decline request")}
+    end
+  end
+
+  def handle_event("remove_friend", %{"id" => friend_id}, socket) do
+    case Accounts.remove_friendship(socket.assigns.player.id, friend_id) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Friend removed")
+         |> reload_friends_data()}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not remove friend")}
+    end
+  end
+
+  defp reload_friends_data(socket) do
+    player_id = socket.assigns.player.id
+
+    socket
+    |> assign(:friends_with_stats, Accounts.get_friends_with_stats(player_id))
+    |> assign(:pending_requests, Accounts.get_pending_requests(player_id))
+    |> assign(:sent_requests, Accounts.get_sent_requests(player_id))
   end
 
   @impl true
@@ -128,7 +205,13 @@ defmodule BughouseWeb.AccountLive do
         <% end %>
 
         <%= if @active_tab == :friends do %>
-          <.friends_tab />
+          <.friends_tab
+            friends_with_stats={@friends_with_stats}
+            pending_requests={@pending_requests}
+            sent_requests={@sent_requests}
+            search_query={@search_query}
+            search_results={@search_results}
+          />
         <% end %>
       </div>
     </div>
@@ -216,12 +299,169 @@ defmodule BughouseWeb.AccountLive do
   # Friends Tab Component
   defp friends_tab(assigns) do
     ~H"""
-    <div class="text-center py-12">
-      <.icon name="hero-user-group" class="size-20 mx-auto mb-4 text-base-content/30" />
-      <h2 class="text-3xl font-bold text-base-content/70">COMING SOON</h2>
-      <p class="mt-4 text-base-content/50">
-        Friend management features will be available in a future update.
-      </p>
+    <div class="space-y-6">
+      <h2 class="text-2xl font-bold">Friends</h2>
+      
+    <!-- Search Bar -->
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text font-semibold">Find Players</span>
+        </label>
+        <input
+          type="text"
+          placeholder="Search by username or display name..."
+          value={@search_query}
+          phx-keyup="search_players"
+          phx-value-query={@search_query}
+          phx-debounce="300"
+          class="input input-bordered w-full max-w-md"
+        />
+        <%= if @search_results != [] do %>
+          <div class="mt-2 bg-base-200 rounded-lg p-2 max-w-md">
+            <div
+              :for={player <- @search_results}
+              class="flex items-center justify-between py-2 px-3 hover:bg-base-300 rounded"
+            >
+              <.link navigate={"/player/#{player.username}"} class="link link-hover font-medium">
+                {player.display_name}
+                <span class="text-sm opacity-60">@{player.username}</span>
+              </.link>
+            </div>
+          </div>
+        <% end %>
+        <%= if @search_query != "" and String.length(@search_query) >= 2 and @search_results == [] do %>
+          <p class="text-sm opacity-50 mt-2">No players found</p>
+        <% end %>
+      </div>
+      
+    <!-- Pending Requests (Incoming) -->
+      <%= if @pending_requests != [] do %>
+        <div>
+          <h3 class="text-lg font-semibold mb-3">
+            Friend Requests
+            <span class="badge badge-primary badge-sm ml-1">{length(@pending_requests)}</span>
+          </h3>
+          <div class="space-y-2">
+            <div
+              :for={request <- @pending_requests}
+              class="flex items-center justify-between bg-base-200 rounded-lg p-3"
+            >
+              <div class="flex items-center gap-3">
+                <.icon name="hero-user-plus" class="size-5 text-info" />
+                <div>
+                  <.link
+                    navigate={"/player/#{request.player.username}"}
+                    class="font-semibold link link-hover"
+                  >
+                    {request.player.display_name}
+                  </.link>
+                  <span class="text-sm opacity-60 ml-1">@{request.player.username}</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button
+                  class="btn btn-success btn-sm"
+                  phx-click="accept_friend"
+                  phx-value-id={request.player.id}
+                >
+                  Accept
+                </button>
+                <button
+                  class="btn btn-ghost btn-sm"
+                  phx-click="reject_friend"
+                  phx-value-id={request.player.id}
+                >
+                  Decline
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+      
+    <!-- Sent Requests (Outgoing) -->
+      <%= if @sent_requests != [] do %>
+        <div>
+          <h3 class="text-lg font-semibold mb-3">Sent Requests</h3>
+          <div class="space-y-2">
+            <div
+              :for={request <- @sent_requests}
+              class="flex items-center justify-between bg-base-200 rounded-lg p-3"
+            >
+              <div class="flex items-center gap-3">
+                <.icon name="hero-clock" class="size-5 text-warning" />
+                <div>
+                  <.link
+                    navigate={"/player/#{request.friend.username}"}
+                    class="font-semibold link link-hover"
+                  >
+                    {request.friend.display_name}
+                  </.link>
+                  <span class="text-sm opacity-60 ml-1">@{request.friend.username}</span>
+                </div>
+              </div>
+              <span class="badge badge-warning badge-sm">Pending</span>
+            </div>
+          </div>
+        </div>
+      <% end %>
+      
+    <!-- Friends List with Stats -->
+      <%= if @friends_with_stats != [] do %>
+        <div>
+          <h3 class="text-lg font-semibold mb-3">
+            Your Friends <span class="badge badge-sm ml-1">{length(@friends_with_stats)}</span>
+          </h3>
+          <div class="overflow-x-auto">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th class="text-center">Total Games</th>
+                  <th class="text-center">Wins With</th>
+                  <th class="text-center">Wins Against</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr :for={%{friend: friend} = entry <- @friends_with_stats}>
+                  <td>
+                    <.link
+                      navigate={"/player/#{friend.username}"}
+                      class="font-semibold link link-hover"
+                    >
+                      {friend.display_name}
+                    </.link>
+                    <span class="text-sm opacity-60 ml-1">@{friend.username}</span>
+                  </td>
+                  <td class="text-center">{entry.total_games}</td>
+                  <td class="text-center text-success font-semibold">{entry.wins_with}</td>
+                  <td class="text-center text-warning font-semibold">{entry.wins_against}</td>
+                  <td class="text-right">
+                    <button
+                      class="btn btn-ghost btn-xs text-error"
+                      phx-click="remove_friend"
+                      phx-value-id={friend.id}
+                      data-confirm="Remove #{friend.display_name} from your friends?"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% else %>
+        <%= if @pending_requests == [] and @sent_requests == [] do %>
+          <div class="text-center py-8">
+            <.icon name="hero-user-group" class="size-16 mx-auto mb-4 text-base-content/30" />
+            <p class="text-base-content/50">
+              No friends yet. Search for players above to add friends!
+            </p>
+          </div>
+        <% end %>
+      <% end %>
     </div>
     """
   end

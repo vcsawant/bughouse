@@ -94,12 +94,13 @@ This creates a unique dynamic where players must balance their own game while co
   - Pagination for large game lists
   - Link to game replay (future feature)
 
-- [ ] **Social Features**
-  - Friend system
-  - Send/accept/reject friend requests
-  - Friends list
-  - Filter game history: "Games with Friends"
-  - View friend profiles
+- [x] **Social Features**
+  - [x] Friend system (send/accept/reject/remove)
+  - [x] Friends list with head-to-head stats (wins with/against)
+  - [x] Player search by username/display name
+  - [x] Player profile badges (bot, friend)
+  - [x] Lobby friend invites with real-time toast notifications
+  - [ ] Filter game history: "Games with Friends"
 
 ### Phase 3: Enhanced Experience
 **Status:** Future
@@ -124,8 +125,12 @@ This creates a unique dynamic where players must balance their own game while co
   - Emotes/quick reactions
   - Team voice chat integration (future)
 
+- [x] **Time Control Selection**
+  - Choose from 1 min, 2 min, 5 min (default), or 10 min when creating a game
+  - Selected time control displayed in the lobby for all players
+
 - [ ] **Game Modes & Variants**
-  - Custom time controls (1-min, 3-min, 5-min, unlimited)
+  - Additional time controls (3-min, unlimited)
   - Rated vs casual games
   - Private lobbies with passwords
   - Tournament brackets
@@ -817,15 +822,29 @@ Track your chess performance over time with comprehensive statistics and game re
 
 #### Friends Tab
 
-**Coming Soon!** Friend management and social features will be added in a future update, including:
-- Send and accept friend requests
-- View friends list with online status
-- Challenge friends to games
-- Head-to-head statistics
-- Recent games with friends
-- Friend activity feed
+Manage your friends and view head-to-head statistics:
 
-Stay tuned for these exciting social features that will make it even easier to play with your regular chess partners!
+**Player Search:**
+- Search for registered players by username or display name (minimum 2 characters)
+- Click search results to visit player profiles where you can send friend requests
+
+**Friend Requests:**
+- View incoming friend requests with Accept/Decline buttons
+- See outgoing pending requests with their status
+- Real-time toast notifications when someone sends you a request or accepts yours
+
+**Friends List:**
+- View all accepted friends in a table with game statistics
+- **Total Games**: Number of completed games played together
+- **Wins With** (green): Games won as teammates (same team)
+- **Wins Against** (orange): Games won as opponents (opposing teams)
+- Remove friends with confirmation dialog
+- Click any friend's name to visit their player profile
+
+**Lobby Invites:**
+- When in a game lobby, use the "Invite Friends" dropdown to send real-time notifications
+- Friends receive a clickable toast notification with a "Join" button that links directly to the lobby
+- Toast notifications auto-dismiss after 10 seconds or can be manually closed
 
 ---
 

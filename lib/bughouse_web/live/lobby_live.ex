@@ -2,6 +2,7 @@ defmodule BughouseWeb.LobbyLive do
   use BughouseWeb, :live_view
   alias Bughouse.Games
   alias Bughouse.Accounts
+  alias Bughouse.Notifications
 
   @impl true
   def mount(%{"invite_code" => code}, _session, socket) do
@@ -33,6 +34,14 @@ defmodule BughouseWeb.LobbyLive do
 
         available_bots = Accounts.list_available_bots()
 
+        friends =
+          if current_player.guest do
+            []
+          else
+            Accounts.get_friends(current_player.id)
+            |> Enum.map(&Accounts.friend_from_friendship(&1, current_player.id))
+          end
+
         {:ok,
          socket
          |> assign(:invite_code, code)
@@ -41,7 +50,8 @@ defmodule BughouseWeb.LobbyLive do
          |> assign(:my_position, my_position)
          |> assign(:share_url, url(socket, ~p"/lobby/#{code}"))
          |> assign(:available_bots, available_bots)
-         |> assign(:bot_player_ids, MapSet.new(available_bots, fn b -> b.player.id end))}
+         |> assign(:bot_player_ids, MapSet.new(available_bots, fn b -> b.player.id end))
+         |> assign(:friends, friends)}
     end
   end
 
@@ -123,9 +133,19 @@ defmodule BughouseWeb.LobbyLive do
 
   def handle_event("remove_player", %{"player_id" => player_id}, socket) do
     case Games.leave_game_all_positions(socket.assigns.game.id, player_id) do
-      {:ok, _} -> {:noreply, socket}
-      {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to remove player: #{reason}")}
+      {:ok, _} ->
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to remove player: #{reason}")}
     end
+  end
+
+  def handle_event("invite_friend", %{"friend_id" => friend_id}, socket) do
+    current = socket.assigns.current_player
+    friend = Accounts.get_player!(friend_id)
+    Notifications.send_lobby_invite(current, friend_id, socket.assigns.invite_code)
+    {:noreply, put_flash(socket, :info, "Invite sent to #{friend.display_name}")}
   end
 
   def handle_event("start_game", _params, socket) do
@@ -207,6 +227,12 @@ defmodule BughouseWeb.LobbyLive do
       not is_nil(game.board_2_black_id)
   end
 
+  defp format_time_control("1min"), do: "1 min"
+  defp format_time_control("2min"), do: "2 min"
+  defp format_time_control("5min"), do: "5 min"
+  defp format_time_control("10min"), do: "10 min"
+  defp format_time_control(other), do: other
+
   defp teammate_position(:board_1_white), do: :board_2_black
   defp teammate_position(:board_2_black), do: :board_1_white
   defp teammate_position(:board_1_black), do: :board_2_white
@@ -283,10 +309,43 @@ defmodule BughouseWeb.LobbyLive do
                 Copy Link
               </button>
             </div>
+            
+    <!-- Invite Friends Dropdown -->
+            <%= if @friends != [] do %>
+              <div class="mt-4">
+                <div class="dropdown">
+                  <label tabindex="0" class="btn btn-outline btn-sm gap-2">
+                    <.icon name="hero-user-group" class="size-4" /> Invite Friends
+                  </label>
+                  <ul
+                    tabindex="0"
+                    class="dropdown-content menu bg-base-200 rounded-lg p-2 w-56 shadow z-10"
+                  >
+                    <li :for={friend <- @friends}>
+                      <button
+                        class="w-full text-left"
+                        phx-click="invite_friend"
+                        phx-value-friend_id={friend.id}
+                      >
+                        {friend.display_name}
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            <% end %>
 
-            <div class="bg-base-300 p-4 rounded-lg text-center mt-4">
-              <span class="text-sm text-base-content/70">Invite Code:</span>
-              <code class="text-2xl font-mono font-bold block">{@invite_code}</code>
+            <div class="flex gap-4 mt-4">
+              <div class="bg-base-300 p-4 rounded-lg text-center flex-1">
+                <span class="text-sm text-base-content/70">Invite Code:</span>
+                <code class="text-2xl font-mono font-bold block">{@invite_code}</code>
+              </div>
+              <div class="bg-base-300 p-4 rounded-lg text-center flex-1">
+                <span class="text-sm text-base-content/70">Time Control:</span>
+                <span class="text-2xl font-bold block">
+                  {format_time_control(@game.time_control)}
+                </span>
+              </div>
             </div>
           </div>
         </div>

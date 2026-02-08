@@ -27,4 +27,9 @@
   
 <!-- Flash Messages -->
   <.flash_group flash={@flash} />
+  
+<!-- Notification Toasts -->
+  <BughouseWeb.NotificationComponents.notification_toasts notifications={
+    assigns[:notifications] || []
+  } />
 </div>

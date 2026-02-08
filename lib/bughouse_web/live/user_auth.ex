@@ -8,6 +8,7 @@ defmodule BughouseWeb.UserAuth do
 
   import Plug.Conn
   alias Bughouse.Accounts
+  alias Bughouse.Notifications
   require Logger
 
   @doc """
@@ -148,6 +149,52 @@ defmodule BughouseWeb.UserAuth do
           |> Phoenix.LiveView.redirect(to: "/login")
 
         {:halt, socket}
+    end
+  end
+
+  # Subscribes non-guest players to notifications and attaches hooks
+  # to handle notification messages and events centrally.
+  def on_mount(:subscribe_notifications, _params, _session, socket) do
+    player = socket.assigns[:current_player]
+
+    socket = Phoenix.Component.assign(socket, :notifications, [])
+
+    if Phoenix.LiveView.connected?(socket) && player && !player.guest do
+      Notifications.subscribe(player.id)
+
+      socket =
+        socket
+        |> Phoenix.LiveView.attach_hook(:notification_info, :handle_info, fn
+          {:notification, notification}, socket ->
+            # Schedule auto-dismiss after 10 seconds
+            Process.send_after(self(), {:dismiss_notification, notification.id}, 10_000)
+
+            notifications = [notification | socket.assigns.notifications]
+            {:halt, Phoenix.Component.assign(socket, :notifications, notifications)}
+
+          {:dismiss_notification, notification_id}, socket ->
+            notifications =
+              Enum.reject(socket.assigns.notifications, &(&1.id == notification_id))
+
+            {:halt, Phoenix.Component.assign(socket, :notifications, notifications)}
+
+          _other, socket ->
+            {:cont, socket}
+        end)
+        |> Phoenix.LiveView.attach_hook(:notification_event, :handle_event, fn
+          "dismiss_notification", %{"id" => notification_id}, socket ->
+            notifications =
+              Enum.reject(socket.assigns.notifications, &(&1.id == notification_id))
+
+            {:halt, Phoenix.Component.assign(socket, :notifications, notifications)}
+
+          _event, _params, socket ->
+            {:cont, socket}
+        end)
+
+      {:cont, socket}
+    else
+      {:cont, socket}
     end
   end
 end
