@@ -46,6 +46,13 @@ defmodule BughouseWeb.GameLive do
          |> put_flash(:error, "Game not found")
          |> redirect(to: ~p"/")}
 
+      %{status: :completed} = game ->
+        Logger.info("GameLive: Game #{code} is completed, redirecting to replay")
+
+        {:ok,
+         socket
+         |> redirect(to: ~p"/game/view/#{game.invite_code}")}
+
       game ->
         if connected?(socket) do
           Games.subscribe_to_game(code)

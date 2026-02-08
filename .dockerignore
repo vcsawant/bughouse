@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+_build/
+deps/
+
+# Node / JS
+node_modules/
+assets/node_modules/
+
+# Generated static files (rebuilt in Docker)
+priv/static/assets/
+priv/static/cache_manifest.json
+
+# Environment and secrets
+.env
+.env.*
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Fly.io
+fly.toml
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test and dev
+test/
+.formatter.exs
+coveralls.json

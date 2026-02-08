@@ -1,0 +1,29 @@
+app = "bughouse"
+primary_region = "ewr"
+
+[build]
+
+[env]
+  PHX_SERVER = "true"
+  PHX_HOST = "bughouse.fly.dev"
+  BUGHOUSE_ENGINE_PATH = "/app/bin/bughouse_engine"
+  BUGHOUSE_ENGINE_LOG_PATH = "/var/log/bughouse/engine"
+  ECTO_IPV6 = "true"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

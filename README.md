@@ -507,42 +507,79 @@ Use ExMachina for factories:
 
 ---
 
-## 🚀 Deployment Strategy
+## 🚀 Deployment
 
 ### Environments
 
 **Development:**
 - Local PostgreSQL
-- Local Phoenix server
+- Local Phoenix server (`mix phx.server`)
 - Hot code reloading enabled
 
-**Production:**
-- Fly.io hosting (single US region)
-- Fly.io managed PostgreSQL
-- SSL via Fly.io
-- Custom domain
+**Production (Fly.io):**
+- App: `bughouse.fly.dev`
+- Region: `ewr` (Secaucus, NJ)
+- VM: `shared-cpu-1x`, 512MB RAM
+- PostgreSQL: Fly.io managed (free tier, 1GB)
+- SSL: Automatic via Fly.io
+- Rust engine: Built in Docker multi-stage build
 
-### Deployment Process
+### First-Time Setup
 
 ```bash
-# 1. Run tests
-mix test
+# 1. Login to Fly.io
+flyctl auth login
 
-# 2. Build release
-MIX_ENV=prod mix release
+# 2. Launch app (creates app on Fly.io, no deploy yet)
+flyctl launch --no-deploy
 
-# 3. Deploy to Fly.io
-fly deploy
+# 3. Create free-tier Postgres
+flyctl postgres create --name bughouse-db --region ewr \
+  --vm-size shared-cpu-1x --initial-cluster-size 1 --volume-size 1
+flyctl postgres attach bughouse-db
 
-# 4. Run migrations
-fly ssh console -C "/app/bin/migrate"
+# 4. Set secrets
+flyctl secrets set SECRET_KEY_BASE=$(mix phx.gen.secret)
+flyctl secrets set GOOGLE_CLIENT_ID=<your-client-id>
+flyctl secrets set GOOGLE_CLIENT_SECRET=<your-client-secret>
+flyctl secrets set GOOGLE_REDIRECT_URI=https://bughouse.fly.dev/auth/google/callback
+
+# 5. Deploy
+flyctl deploy
+
+# 6. Run migrations and seed the bot
+flyctl ssh console -C "/app/bin/migrate"
+flyctl ssh console -C "/app/bin/seed"
 ```
+
+### Subsequent Deploys
+
+```bash
+# Deploy new code
+flyctl deploy
+
+# Run any new migrations
+flyctl ssh console -C "/app/bin/migrate"
+```
+
+### Docker Build
+
+The `Dockerfile` uses a 3-stage multi-stage build:
+
+1. **Rust builder** — Clones [bughouse-engine](https://github.com/vcsawant/bughouse-engine) from GitHub and compiles the engine binary with `cargo build --release`
+2. **Elixir builder** — Standard Phoenix release build (deps, assets, `mix release`)
+3. **Runner** — Slim Debian image with the Elixir release + Rust engine binary
 
 ### Monitoring
 
+```bash
+flyctl status           # App health
+flyctl logs             # Live log tail
+flyctl ssh console      # Shell into the running VM
+```
+
 - Fly.io metrics dashboard
 - Phoenix LiveDashboard (production)
-- Error tracking via Logger
 - (Future: Sentry/AppSignal integration)
 
 ### Backup Strategy

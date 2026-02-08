@@ -7,9 +7,9 @@ import Config
 # before starting your production server.
 config :bughouse, BughouseWeb.Endpoint, cache_static_manifest: "priv/static/cache_manifest.json"
 
-# Force using SSL in production. This also sets the "strict-security-transport" header,
-# also known as HSTS. `:force_ssl` is required to be set at compile-time.
-config :bughouse, BughouseWeb.Endpoint, force_ssl: [rewrite_on: [:x_forwarded_proto]]
+# SSL is handled by Fly.io's proxy (force_https = true in fly.toml).
+# Do NOT set force_ssl here — it breaks Fly's internal health checks
+# which hit the app directly on port 4000 without x-forwarded-proto.
 
 # Do not print debug messages in production
 config :logger, level: :info
