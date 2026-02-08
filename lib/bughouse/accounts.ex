@@ -99,8 +99,7 @@ defmodule Bughouse.Accounts do
   def accept_friendship(player_id, requester_id) do
     query =
       from(f in Friendship,
-        where:
-          f.player_id == ^requester_id and f.friend_id == ^player_id and f.status == :pending
+        where: f.player_id == ^requester_id and f.friend_id == ^player_id and f.status == :pending
       )
 
     case Repo.one(query) do
@@ -121,8 +120,7 @@ defmodule Bughouse.Accounts do
   def reject_friendship(player_id, requester_id) do
     query =
       from(f in Friendship,
-        where:
-          f.player_id == ^requester_id and f.friend_id == ^player_id and f.status == :pending
+        where: f.player_id == ^requester_id and f.friend_id == ^player_id and f.status == :pending
       )
 
     case Repo.one(query) do

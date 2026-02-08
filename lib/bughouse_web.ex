@@ -83,6 +83,8 @@ defmodule BughouseWeb do
       import BughouseWeb.CoreComponents
       # Chess-specific components (boards, pieces, etc.)
       import BughouseWeb.ChessComponents
+      # Team communication components (quick-comm panel, toasts)
+      import BughouseWeb.TeamCommComponents
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

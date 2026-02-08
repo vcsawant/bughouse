@@ -282,4 +282,20 @@
   animation: slide-in-right 0.3s ease-out;
 }
 
+/* Team communication toast slide-in animation */
+@keyframes slide-in-up {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.3s ease-out;
+}
+
 /* This file is for your main application CSS */

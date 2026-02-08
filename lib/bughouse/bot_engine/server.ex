@@ -12,12 +12,14 @@ defmodule Bughouse.BotEngine.Server do
   require Logger
 
   alias Bughouse.Games
+  alias Bughouse.TeamComm
 
   defstruct [
     :port,
     :game_id,
     :invite_code,
     :bot_player_id,
+    :bot_team,
     :positions,
     :engine_ready,
     :pending_go,
@@ -42,6 +44,13 @@ defmodule Bughouse.BotEngine.Server do
     # Subscribe to game PubSub — same topic as GameLive
     Games.subscribe_to_game(invite_code)
 
+    # Subscribe to team-scoped topic for teammate communication
+    bot_team = TeamComm.team_for_positions(positions)
+
+    if bot_team do
+      TeamComm.subscribe(invite_code, bot_team)
+    end
+
     # Open Port to the engine binary
     engine_path = get_engine_path()
     engine_args = build_engine_args(game_id)
@@ -60,6 +69,7 @@ defmodule Bughouse.BotEngine.Server do
       game_id: game_id,
       invite_code: invite_code,
       bot_player_id: bot_player_id,
+      bot_team: bot_team,
       positions: MapSet.new(positions),
       engine_ready: false,
       pending_go: nil,
@@ -113,6 +123,16 @@ defmodule Bughouse.BotEngine.Server do
   end
 
   def handle_info({:player_left, _game}, state) do
+    {:noreply, state}
+  end
+
+  # Team communication from human teammate — forward as BUP partnermsg to engine
+  def handle_info({:team_message, message}, state) do
+    if message.from_player_id != state.bot_player_id and state.port != nil do
+      bup_line = TeamComm.to_bup_partnermsg(message)
+      send_to_engine(state.port, bup_line)
+    end
+
     {:noreply, state}
   end
 
@@ -171,6 +191,23 @@ defmodule Bughouse.BotEngine.Server do
 
   defp handle_engine_line("info " <> _rest, state) do
     # Search info — ignore for now (could log in debug)
+    state
+  end
+
+  defp handle_engine_line("teammsg " <> _rest = line, state) do
+    # Engine wants to communicate with its human teammate
+    if state.bot_team do
+      bot_position = get_bot_active_position(state)
+
+      case TeamComm.parse_engine_teammsg(line, state.bot_player_id, bot_position) do
+        {:ok, message} ->
+          TeamComm.broadcast(state.invite_code, state.bot_team, message)
+
+        {:error, _} ->
+          Logger.debug("BotEngineServer: failed to parse teammsg: #{inspect(line)}")
+      end
+    end
+
     state
   end
 
@@ -315,6 +352,11 @@ defmodule Bughouse.BotEngine.Server do
 
   defp position_to_bup_board(position) when position in [:board_1_white, :board_1_black], do: "A"
   defp position_to_bup_board(position) when position in [:board_2_white, :board_2_black], do: "B"
+
+  defp get_bot_active_position(state) do
+    # Return the position the bot is currently thinking about, or the first position
+    state.pending_go || Enum.at(MapSet.to_list(state.positions), 0)
+  end
 
   defp get_engine_path do
     Application.get_env(:bughouse, :bot_engine)[:engine_path] ||

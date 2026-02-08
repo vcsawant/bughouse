@@ -27,6 +27,7 @@ defmodule BughouseWeb.GameLive do
   """
   use BughouseWeb, :live_view
   alias Bughouse.Games
+  alias Bughouse.TeamComm
 
   @impl true
   def mount(%{"invite_code" => code}, _session, socket) do
@@ -56,6 +57,21 @@ defmodule BughouseWeb.GameLive do
       game ->
         if connected?(socket) do
           Games.subscribe_to_game(code)
+
+          my_pos = find_my_position(game, current_player.id)
+          my_tm = get_my_team(my_pos)
+
+          if my_tm do
+            TeamComm.subscribe(code, my_tm)
+
+            Logger.info(
+              "TeamComm: subscribed player #{current_player.id} " <>
+                "to team #{inspect(my_tm)} for game #{code} (pos=#{inspect(my_pos)})"
+            )
+          else
+            Logger.warning("TeamComm: player #{current_player.id} has no team (pos=#{inspect(my_pos)})")
+          end
+
           Logger.debug("GameLive: Subscribed to game:#{code}")
         end
 
@@ -86,7 +102,10 @@ defmodule BughouseWeb.GameLive do
          |> assign(:hover_highlighted_squares, [])
          |> assign(:promotion_square, nil)
          |> assign(:promotion_from, nil)
-         |> assign(:legal_moves, [])}
+         |> assign(:legal_moves, [])
+         |> assign(:team_messages, [])
+         |> assign(:comm_panel_open, true)
+         |> assign(:last_team_msg_at, System.monotonic_time(:millisecond) - 2_000)}
     end
   end
 
@@ -289,6 +308,51 @@ defmodule BughouseWeb.GameLive do
     {:noreply, socket}
   end
 
+  # --- Team Communication Events ---
+
+  @impl true
+  def handle_event("send_team_msg", params, socket) do
+    require Logger
+    my_team = socket.assigns.my_team
+    result = socket.assigns.game_state.result
+
+    Logger.debug(
+      "TeamComm: send_team_msg params=#{inspect(params)}, " <>
+        "team=#{inspect(my_team)}, result=#{inspect(result)}, " <>
+        "player=#{socket.assigns.current_player.id}"
+    )
+
+    if my_team == nil or result != nil do
+      Logger.debug("TeamComm: skipped — no team or game over")
+      {:noreply, socket}
+    else
+      now = System.monotonic_time(:millisecond)
+
+      # Rate limit: 1 message per second
+      if now - socket.assigns.last_team_msg_at < 1_000 do
+        Logger.debug("TeamComm: skipped — rate limited")
+        {:noreply, socket}
+      else
+        message = build_team_message(params, socket)
+
+        Logger.info(
+          "TeamComm: broadcasting #{message.type} from #{message.from_player_id} " <>
+            "to #{inspect(my_team)} on game #{socket.assigns.invite_code}"
+        )
+
+        TeamComm.broadcast(socket.assigns.invite_code, my_team, message)
+        {:noreply, assign(socket, last_team_msg_at: now)}
+      end
+    end
+  end
+
+  @impl true
+  def handle_event("toggle_comm_panel", _params, socket) do
+    {:noreply, assign(socket, comm_panel_open: !socket.assigns.comm_panel_open)}
+  end
+
+  # --- PubSub Handlers ---
+
   @impl true
   def handle_info({:game_state_update, new_state}, socket) do
     {:noreply, assign(socket, game_state: new_state)}
@@ -297,6 +361,40 @@ defmodule BughouseWeb.GameLive do
   @impl true
   def handle_info({:game_over, final_state}, socket) do
     {:noreply, assign(socket, game_state: final_state)}
+  end
+
+  @impl true
+  def handle_info({:team_message, message}, socket) do
+    require Logger
+
+    Logger.debug(
+      "TeamComm: received team_message type=#{message.type} " <>
+        "from=#{message.from_player_id}, me=#{socket.assigns.current_player.id}"
+    )
+
+    # Only display messages from teammate, not from self
+    if message.from_player_id != socket.assigns.current_player.id do
+      # Schedule auto-dismiss after 4 seconds
+      Process.send_after(self(), {:dismiss_team_message, message.id}, 4_000)
+
+      messages = [message | socket.assigns.team_messages] |> Enum.take(5)
+
+      Logger.info(
+        "TeamComm: showing toast #{message.type} to #{socket.assigns.current_player.id}, " <>
+          "total messages: #{length(messages)}"
+      )
+
+      {:noreply, assign(socket, team_messages: messages)}
+    else
+      Logger.debug("TeamComm: ignoring own message")
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:dismiss_team_message, msg_id}, socket) do
+    messages = Enum.reject(socket.assigns.team_messages, &(&1.id == msg_id))
+    {:noreply, assign(socket, team_messages: messages)}
   end
 
   # Private helper functions
@@ -412,6 +510,53 @@ defmodule BughouseWeb.GameLive do
     Map.get(players, player_id, "Waiting...")
   end
 
+  # --- Team Message Builders ---
+
+  defp build_team_message(%{"type" => "need", "piece" => piece}, socket) do
+    TeamComm.build_message(
+      :need,
+      %{piece: piece, urgency: :medium},
+      socket.assigns.current_player.id,
+      socket.assigns.my_position
+    )
+  end
+
+  defp build_team_message(%{"type" => "stall"}, socket) do
+    TeamComm.build_message(
+      :stall,
+      %{},
+      socket.assigns.current_player.id,
+      socket.assigns.my_position
+    )
+  end
+
+  defp build_team_message(%{"type" => "play_fast"}, socket) do
+    TeamComm.build_message(
+      :play_fast,
+      %{},
+      socket.assigns.current_player.id,
+      socket.assigns.my_position
+    )
+  end
+
+  defp build_team_message(%{"type" => "threat", "level" => level}, socket) do
+    TeamComm.build_message(
+      :threat,
+      %{level: String.to_atom(level)},
+      socket.assigns.current_player.id,
+      socket.assigns.my_position
+    )
+  end
+
+  defp build_team_message(%{"type" => "threat"}, socket) do
+    TeamComm.build_message(
+      :threat,
+      %{level: :high},
+      socket.assigns.current_player.id,
+      socket.assigns.my_position
+    )
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -471,7 +616,7 @@ defmodule BughouseWeb.GameLive do
       </div>
       
     <!-- Team 2 Clocks and Reserves (Above boards) -->
-      <div class="grid grid-cols-2 gap-8 mb-4">
+      <div class="grid grid-cols-[1fr_auto_1fr] gap-4 mb-4">
         <.clock_and_reserves
           position={:board_1_black}
           time_ms={@game_state.clocks.board_1_black}
@@ -480,6 +625,7 @@ defmodule BughouseWeb.GameLive do
           can_select={@my_position == :board_1_black}
           selected_piece={@selected_reserve_piece}
         />
+        <div class="w-24"></div>
         <.clock_and_reserves
           position={:board_2_white}
           time_ms={@game_state.clocks.board_2_white}
@@ -490,8 +636,8 @@ defmodule BughouseWeb.GameLive do
         />
       </div>
       
-    <!-- Two Boards -->
-      <div class="grid grid-cols-2 gap-8 mb-4">
+    <!-- Two Boards with Team Communication Panel -->
+      <div class="grid grid-cols-[1fr_auto_1fr] gap-4 mb-4">
         <.interactive_chess_board
           board_num={1}
           fen={@game_state.board_1_fen}
@@ -504,6 +650,29 @@ defmodule BughouseWeb.GameLive do
           hover_highlighted_squares={@hover_highlighted_squares}
           promotion_square={@promotion_square}
         />
+
+        <%!-- Center: Team Communication Panel (players only, active game only) --%>
+        <%= if @my_position != nil and @game_state.result == nil do %>
+          <div class="relative flex flex-col items-center justify-center w-24">
+            <.team_message_feed messages={@team_messages} my_team={@my_team} />
+            <button
+              type="button"
+              phx-click="toggle_comm_panel"
+              class="btn btn-ghost btn-xs btn-circle my-1 opacity-60 hover:opacity-100"
+              title={if @comm_panel_open, do: "Hide signals", else: "Show signals"}
+            >
+              <%= if @comm_panel_open do %>
+                <span class="text-sm">▲</span>
+              <% else %>
+                <span class="text-sm">💬</span>
+              <% end %>
+            </button>
+            <.team_comm_panel open={@comm_panel_open} my_position={@my_position} />
+          </div>
+        <% else %>
+          <div class="w-24"></div>
+        <% end %>
+
         <.interactive_chess_board
           board_num={2}
           fen={@game_state.board_2_fen}
@@ -519,7 +688,7 @@ defmodule BughouseWeb.GameLive do
       </div>
       
     <!-- Team 1 Clocks and Reserves (Below boards) -->
-      <div class="grid grid-cols-2 gap-8 mb-4">
+      <div class="grid grid-cols-[1fr_auto_1fr] gap-4 mb-4">
         <.clock_and_reserves
           position={:board_1_white}
           time_ms={@game_state.clocks.board_1_white}
@@ -528,6 +697,7 @@ defmodule BughouseWeb.GameLive do
           can_select={@my_position == :board_1_white}
           selected_piece={@selected_reserve_piece}
         />
+        <div class="w-24"></div>
         <.clock_and_reserves
           position={:board_2_black}
           time_ms={@game_state.clocks.board_2_black}

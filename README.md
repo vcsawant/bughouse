@@ -120,10 +120,10 @@ This creates a unique dynamic where players must balance their own game while co
   - Leaderboards
 
 - [ ] **Communication**
-  - In-game chat between teammates
-  - Post-game chat room
-  - Emotes/quick reactions
-  - Team voice chat integration (future)
+  - [x] In-game team signals (BUP-based quick-comm: piece requests, stall, hurry, threat)
+  - [ ] Post-game chat room
+  - [ ] Emotes/quick reactions
+  - [ ] Team voice chat integration (future)
 
 - [x] **Time Control Selection**
   - Choose from 1 min, 2 min, 5 min (default), or 10 min when creating a game
@@ -420,6 +420,13 @@ events:
   - piece_dropped
   - time_updated
   - game_ended
+```
+
+**Team Communication:**
+```elixir
+topic: "game:#{invite_code}:team_1" | "game:#{invite_code}:team_2"
+events:
+  - team_message (BUP protocol: need, stall, play_fast, material, threat)
 ```
 
 **Lobby Updates:**
