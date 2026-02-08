@@ -109,17 +109,19 @@ defmodule Bughouse.Games do
         |> Game.changeset(Map.put(completion_attrs, :status, :completed))
         |> Repo.update()
 
-      # 2. Create game_player records and update player stats
-      # List of player outcomes
+      # 2. Create game_player records (one per seat, even for dual bots)
       player_results = completion_attrs.player_results
 
       Enum.each(player_results, fn player_result ->
-        # Create game_player record
         %GamePlayer{}
         |> GamePlayer.changeset(Map.put(player_result, :game_id, game.id))
         |> Repo.insert!()
+      end)
 
-        # Update player stats
+      # 3. Update player stats (once per unique player, not per seat)
+      player_results
+      |> Enum.uniq_by(& &1.player_id)
+      |> Enum.each(fn player_result ->
         player = Accounts.get_player!(player_result.player_id)
         Accounts.update_player_stats(player, player_result)
       end)
@@ -245,6 +247,7 @@ defmodule Bughouse.Games do
       where: gp.player_id == ^player_id,
       join: g in assoc(gp, :game),
       where: g.status == :completed,
+      distinct: gp.game_id,
       order_by: [desc: gp.created_at],
       limit: ^limit,
       select: {g, gp}
@@ -786,11 +789,8 @@ defmodule Bughouse.Games do
           Logger.info("Started bot engine for #{bot_player_id} in game #{game.invite_code}")
 
         {:error, reason} ->
-          Logger.error(
-            "Failed to start bot engine for #{bot_player_id}: #{inspect(reason)}"
-          )
+          Logger.error("Failed to start bot engine for #{bot_player_id}: #{inspect(reason)}")
       end
     end)
   end
-
 end

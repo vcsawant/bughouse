@@ -252,4 +252,18 @@
   transform: scale(1.05);
 }
 
+/* Replay move animations */
+
+/* Sliding piece during move animation - elevated above other pieces */
+.chess-piece.replay-sliding {
+  z-index: 10;
+  position: relative;
+}
+
+/* Yellow flash on reserve button when a piece is dropped */
+@keyframes replay-reserve-flash {
+  0% { background-color: oklch(90% 0.18 85 / 0.8); }
+  100% { background-color: transparent; }
+}
+
 /* This file is for your main application CSS */

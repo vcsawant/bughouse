@@ -63,7 +63,7 @@ defmodule BughouseWeb.Layouts do
   """
   def theme_toggle(assigns) do
     ~H"""
-    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">
+    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full w-fit">
       <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
 
       <button
@@ -101,10 +101,8 @@ defmodule BughouseWeb.Layouts do
   def user_menu(assigns) do
     ~H"""
     <div class="dropdown dropdown-end">
-      <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
-        <div class="w-10 rounded-full flex items-center justify-center">
-          <.icon name="hero-user-circle" class="size-8" />
-        </div>
+      <div tabindex="0" role="button" class="btn btn-ghost btn-sm">
+        <.icon name="hero-user-circle" class="size-6" />
       </div>
       <ul
         tabindex="0"
@@ -113,6 +111,11 @@ defmodule BughouseWeb.Layouts do
         <%= if @current_player.guest do %>
           <li class="menu-title">
             <span>{@current_player.display_name}</span>
+          </li>
+          <li>
+            <a href={~p"/settings"}>
+              <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
+            </a>
           </li>
           <li>
             <a href={~p"/login"}>
@@ -130,6 +133,11 @@ defmodule BughouseWeb.Layouts do
           <li>
             <a href={~p"/account"}>
               <.icon name="hero-user" class="size-4" /> Account
+            </a>
+          </li>
+          <li>
+            <a href={~p"/settings"}>
+              <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
             </a>
           </li>
           <li>

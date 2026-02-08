@@ -121,10 +121,10 @@ defmodule BughouseWeb.LobbyLive do
     end
   end
 
-  def handle_event("remove_bot", %{"player_id" => player_id}, socket) do
+  def handle_event("remove_player", %{"player_id" => player_id}, socket) do
     case Games.leave_game_all_positions(socket.assigns.game.id, player_id) do
       {:ok, _} -> {:noreply, socket}
-      {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to remove bot: #{reason}")}
+      {:error, reason} -> {:noreply, put_flash(socket, :error, "Failed to remove player: #{reason}")}
     end
   end
 
@@ -376,10 +376,6 @@ defmodule BughouseWeb.LobbyLive do
               </div>
               <div class="text-xs font-semibold text-center mt-2 opacity-50">Team 1</div>
             </div>
-            <!-- Chess Board Theme Selector -->
-            <div class="bg-base-300 rounded-lg p-4 mb-4">
-              <.chess_board_theme_selector />
-            </div>
             <!-- Team Info -->
             <div class="alert alert-info mb-4">
               <svg
@@ -462,10 +458,10 @@ defmodule BughouseWeb.LobbyLive do
           </div>
           
     <!-- right: action buttons -->
-          <%= if is_bot && @game.status == :waiting do %>
+          <%= if is_occupied && @game.status == :waiting && @position != @my_position do %>
             <button
               class="btn btn-xs btn-ghost btn-error"
-              phx-click="remove_bot"
+              phx-click="remove_player"
               phx-value-player_id={player_id}
             >
               ✕

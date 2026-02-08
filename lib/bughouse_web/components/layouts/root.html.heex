@@ -36,27 +36,20 @@
         window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
 
         // Chess board theme (board colors - independent from app theme)
+        // Set on <html> element (like app theme) so LiveView DOM patching can't overwrite it
         const setChessTheme = (theme) => {
           localStorage.setItem("phx:chess-theme", theme);
-          // Apply theme to all chess boards on the page
-          document.querySelectorAll("[data-chess-board]").forEach(board => {
-            if (theme === "classic") {
-              board.removeAttribute("data-chess-theme");
-            } else {
-              board.setAttribute("data-chess-theme", theme);
-            }
-          });
+          if (theme === "classic") {
+            document.documentElement.removeAttribute("data-chess-theme");
+          } else {
+            document.documentElement.setAttribute("data-chess-theme", theme);
+          }
         };
 
         // Restore saved chess theme on page load
         const savedChessTheme = localStorage.getItem("phx:chess-theme") || "classic";
         if (savedChessTheme !== "classic") {
-          // Wait for DOM to be ready
-          if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", () => setChessTheme(savedChessTheme));
-          } else {
-            setChessTheme(savedChessTheme);
-          }
+          setChessTheme(savedChessTheme);
         }
 
         // Listen for chess theme changes

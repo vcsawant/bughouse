@@ -27,6 +27,13 @@ export const ReplayPlayer = {
     this.animationFrameId = null;
     this.lastFrameTime = 0;
 
+    // Move animation state
+    this.moveAnimating = false;
+    this.moveAnimationTimer = null;
+    this.pendingAnimationFinish = null;
+    this.pendingSlide = null; // FLIP animation waiting for DOM update
+    this.skipAnimation = false;
+
     // Cache clock DOM elements for direct updates
     this.clockElements = {
       board_1_white: null,
@@ -51,6 +58,19 @@ export const ReplayPlayer = {
 
     // Initialize progress bar at 0%
     this.updateProgressBar();
+  },
+
+  /**
+   * Called by LiveView after DOM patching. Used to trigger FLIP animations
+   * that were queued by animateSlide() — the piece has now been moved to its
+   * destination by LiveView, so we can animate from old position to new.
+   */
+  updated() {
+    if (this.pendingSlide) {
+      const params = this.pendingSlide;
+      this.pendingSlide = null;
+      this.startSlideAnimation(params);
+    }
   },
 
   /**
@@ -216,25 +236,30 @@ export const ReplayPlayer = {
     const deltaTime = currentTime - this.lastFrameTime;
     this.lastFrameTime = currentTime;
 
-    // Advance playback based on speed
-    const gameTimeDelta = deltaTime * this.playbackSpeed;
-    this.currentTimestamp += gameTimeDelta;
+    // Freeze game time while a piece is sliding. The tick loop keeps running
+    // so we can resume immediately when the animation finishes, but we don't
+    // advance the timestamp or trigger new state changes.
+    if (!this.moveAnimating) {
+      // Advance playback based on speed
+      const gameTimeDelta = deltaTime * this.playbackSpeed;
+      this.currentTimestamp += gameTimeDelta;
 
-    // Check if we reached the end
-    if (this.currentTimestamp >= this.totalDuration) {
-      this.currentTimestamp = this.totalDuration;
-      this.pause();
-      return;  // Exit immediately after pausing
+      // Check if we reached the end
+      if (this.currentTimestamp >= this.totalDuration) {
+        this.currentTimestamp = this.totalDuration;
+        this.pause();
+        return;  // Exit immediately after pausing
+      }
+
+      // Update progress bar smoothly (60fps interpolation)
+      this.updateProgressBar();
+
+      // Update clocks locally via DOM (~1fps when seconds change)
+      this.updateClocksLocally(this.currentTimestamp);
+
+      // Update full state (FEN, reserves) only on move boundaries
+      this.updateStateAtTimestamp(this.currentTimestamp);
     }
-
-    // Update progress bar smoothly (60fps interpolation)
-    this.updateProgressBar();
-
-    // Update clocks locally via DOM (~1fps when seconds change)
-    this.updateClocksLocally(this.currentTimestamp);
-
-    // Update full state (FEN, reserves) only on move boundaries
-    this.updateStateAtTimestamp(this.currentTimestamp);
 
     // Schedule next frame only if still playing (double-check to prevent race conditions)
     if (this.isPlaying) {
@@ -265,11 +290,16 @@ export const ReplayPlayer = {
   seekToTimestamp(timestamp) {
     this.currentTimestamp = Math.max(0, Math.min(timestamp, this.totalDuration));
 
-    // Force immediate update (even when paused)
+    // Cancel any in-progress move animation
+    this.cancelMoveAnimation();
+
+    // Force immediate update (even when paused), skip animations for seeks
     this.currentMoveIndex = -1;
+    this.skipAnimation = true;
     this.updateProgressBar();  // Update progress bar immediately
     this.updateClocksLocally(this.currentTimestamp);
     this.updateStateAtTimestamp(this.currentTimestamp);
+    this.skipAnimation = false;
   },
 
   /**
@@ -535,26 +565,42 @@ export const ReplayPlayer = {
   },
 
   /**
-   * Update state at a specific timestamp
-   * Only pushes to LiveView when crossing move boundaries (FEN/reserves change)
+   * Update state at a specific timestamp.
+   * During playback: steps one move at a time (currentMoveIndex + 1) so
+   * every move gets a chance to animate, even when rapid engine moves
+   * cause the timestamp to jump past several at once.
+   * During seeks: jumps directly to the target move (no animation).
    */
   updateStateAtTimestamp(timestamp) {
-    // Find the last move at or before this timestamp
-    const move = this.findMoveAtTimestamp(timestamp);
+    let move, newMoveIndex, shouldAnimate;
 
-    if (!move) {
-      // Before first move - show starting position
-      return;
+    if (this.skipAnimation) {
+      // Seeking: jump directly to the target move
+      move = this.findMoveAtTimestamp(timestamp);
+      if (!move) return;
+      newMoveIndex = this.moveHistory.indexOf(move);
+      shouldAnimate = false;
+    } else {
+      // Playback: step to the NEXT move only, never skip ahead
+      const nextIdx = this.currentMoveIndex + 1;
+      if (nextIdx >= this.moveHistory.length) return;
+
+      const nextMove = this.moveHistory[nextIdx];
+      if (nextMove.timestamp > timestamp) return; // Not time yet
+
+      move = nextMove;
+      newMoveIndex = nextIdx;
+
+      // Safety: if previous animation is still running, finish it first
+      if (this.moveAnimating) {
+        this.finishCurrentAnimation();
+      }
+      shouldAnimate = !this.moveAnimating;
     }
 
-    const newMoveIndex = this.moveHistory.indexOf(move);
+    if (newMoveIndex === this.currentMoveIndex) return;
 
-    // Only update LiveView when we cross move boundaries
-    // Clocks are updated locally via DOM (see updateClocksLocally)
-    if (newMoveIndex === this.currentMoveIndex) {
-      return;
-    }
-
+    const oldMoveIndex = this.currentMoveIndex;
     this.currentMoveIndex = newMoveIndex;
 
     // Check if move has FEN data (old games may not have FEN stored)
@@ -568,7 +614,6 @@ export const ReplayPlayer = {
     const state = {
       board_1_fen: move.board_1_fen,
       board_2_fen: move.board_2_fen,
-      // Each player has their own reserves
       board_1_white_reserves: move.board_1_white_reserves || [],
       board_1_black_reserves: move.board_1_black_reserves || [],
       board_2_white_reserves: move.board_2_white_reserves || [],
@@ -576,7 +621,345 @@ export const ReplayPlayer = {
       move_index: newMoveIndex
     };
 
+    if (shouldAnimate && move.type === 'move' && move.notation && move.notation.length >= 4) {
+      this.animateSlide(move, oldMoveIndex, state);
+    } else if (shouldAnimate && move.type === 'drop' && move.notation) {
+      this.animateDrop(move, oldMoveIndex, state);
+    } else {
+      this.pushEvent("update_state", state);
+    }
+  },
+
+  // ── Move Animation Methods ──────────────────────────────────────────
+
+  /**
+   * Animate a piece sliding using the FLIP technique.
+   *
+   * FLIP = First, Last, Invert, Play:
+   * 1. FIRST: snapshot the piece's screen position before the DOM update
+   * 2. Push state to LiveView (DOM gets patched with new FEN)
+   * 3. LAST: (in updated() → startSlideAnimation) find the piece at its new position
+   * 4. INVERT: apply a reverse transform so it visually appears at the old position
+   * 5. PLAY: animate the transform to (0,0) so it slides into place
+   *
+   * This approach works WITH LiveView's DOM patching instead of racing against it.
+   */
+  animateSlide(move, oldMoveIndex, state) {
+    const from = move.notation.substring(0, 2);
+    const boardNum = move.board;
+    const isFlipped = boardNum === 2;
+
+    const grid = this.getBoardGrid(boardNum);
+    if (!grid) { this.pushEvent("update_state", state); return; }
+
+    const fromIdx = this.algebraicToGridIndex(from, isFlipped);
+    const fromSquare = grid.children[fromIdx];
+    if (!fromSquare) { this.pushEvent("update_state", state); return; }
+
+    // FIRST: snapshot where the piece is right now
+    const firstRect = fromSquare.getBoundingClientRect();
+
+    const to = move.notation.substring(2, 4);
+    const toIdx = this.algebraicToGridIndex(to, isFlipped);
+
+    this.moveAnimating = true;
+
+    // Store params for the animation — started by updated() after DOM patch
+    this.pendingSlide = {
+      firstRect,
+      toIdx,
+      boardNum,
+      duration: Math.max(200, 450 - 50 * this.playbackSpeed)
+    };
+
+    // Push state to LiveView — triggers DOM patch, then updated() callback
     this.pushEvent("update_state", state);
+  },
+
+  /**
+   * Run the FLIP slide animation after LiveView has patched the DOM.
+   * Called from updated() when pendingSlide is set.
+   */
+  startSlideAnimation({ firstRect, toIdx, boardNum, duration, dropInfo }) {
+    const grid = this.getBoardGrid(boardNum);
+    if (!grid) { this.moveAnimating = false; return; }
+
+    const destSquare = grid.children[toIdx];
+    if (!destSquare) { this.moveAnimating = false; return; }
+
+    const destPiece = destSquare.querySelector('.chess-piece');
+    if (!destPiece) { this.moveAnimating = false; return; }
+
+    // LAST: where the piece is now (at destination, after DOM update)
+    const lastRect = destSquare.getBoundingClientRect();
+
+    // INVERT: offset from new position back to old position
+    const dx = firstRect.left - lastRect.left;
+    const dy = firstRect.top - lastRect.top;
+
+    // Skip if no visual movement (shouldn't happen, but safety check)
+    if (dx === 0 && dy === 0) { this.moveAnimating = false; return; }
+
+    // Allow the piece to render outside the destination square during slide
+    destSquare.style.overflow = 'visible';
+
+    // Flash the reserve button for drops — find fresh from DOM after patch
+    const flashedBtn = dropInfo
+      ? this.findReservePieceButton(dropInfo.position, dropInfo.piece)
+      : null;
+    if (flashedBtn) {
+      flashedBtn.style.animation = 'none';
+      flashedBtn.offsetHeight;
+      flashedBtn.style.animation = `replay-reserve-flash ${duration}ms ease-out`;
+    }
+
+    // Instantly position piece at old location (reverse transform)
+    destPiece.classList.add('replay-sliding');
+    destPiece.style.transition = 'none';
+    destPiece.style.transform = `translate(${dx}px, ${dy}px)`;
+
+    // Force reflow so the reverse transform is applied before animation
+    destPiece.offsetHeight;
+
+    // PLAY: animate to actual position (0,0)
+    destPiece.style.transition = `transform ${duration}ms ease`;
+    destPiece.style.transform = 'translate(0, 0)';
+
+    this.pendingAnimationFinish = () => {
+      if (this.moveAnimationTimer) {
+        clearTimeout(this.moveAnimationTimer);
+        this.moveAnimationTimer = null;
+      }
+      destPiece.classList.remove('replay-sliding');
+      destPiece.style.transition = '';
+      destPiece.style.transform = '';
+      destSquare.style.overflow = '';
+      if (flashedBtn) flashedBtn.style.animation = '';
+      this.moveAnimating = false;
+      this.pendingAnimationFinish = null;
+    };
+
+    this.moveAnimationTimer = setTimeout(() => {
+      if (this.pendingAnimationFinish) this.pendingAnimationFinish();
+    }, duration);
+  },
+
+  /**
+   * Animate a piece drop using the FLIP technique.
+   * Snapshots the reserve button position, pushes state, then
+   * startSlideAnimation slides the piece from the reserve to the board.
+   */
+  animateDrop(move, oldMoveIndex, state) {
+    const boardNum = move.board;
+    const isFlipped = boardNum === 2;
+
+    // Drop notation is "P@e4" (piece@square) — extract destination and piece
+    const atIdx = move.notation.indexOf('@');
+    const destAlgebraic = atIdx >= 0 ? move.notation.substring(atIdx + 1) : move.notation;
+    const notationPiece = atIdx >= 0 ? move.notation.substring(0, atIdx).toLowerCase() : null;
+
+    // Determine which piece was dropped (three strategies):
+    // 1. From the notation itself (most reliable)
+    // 2. Read FEN at destination square
+    // 3. Diff reserves before/after
+    const boardFen = boardNum === 1 ? move.board_1_fen : move.board_2_fen;
+    const fenPiece = this.getPieceAtSquare(boardFen, destAlgebraic);
+    const diffPiece = this.getDroppedPieceType(oldMoveIndex, move);
+    const droppedPiece = notationPiece || fenPiece || diffPiece;
+
+    // Find the source rect: specific reserve button, or the reserves container
+    let firstRect = null;
+    if (droppedPiece) {
+      const reserveBtn = this.findReservePieceButton(move.position, droppedPiece);
+      if (reserveBtn) {
+        firstRect = reserveBtn.getBoundingClientRect();
+      }
+    }
+    if (!firstRect) {
+      // Fallback: use the reserves container center
+      const reservesContainer = this.findReservesContainer(move.position);
+      if (reservesContainer) {
+        firstRect = reservesContainer.getBoundingClientRect();
+      }
+    }
+
+    if (!firstRect) { this.pushEvent("update_state", state); return; }
+
+    const toIdx = this.algebraicToGridIndex(destAlgebraic, isFlipped);
+    const duration = Math.max(200, 450 - 50 * this.playbackSpeed);
+
+    this.moveAnimating = true;
+
+    // Reuse the same pendingSlide mechanism — startSlideAnimation works
+    // for any source rect (board square or reserve button)
+    this.pendingSlide = {
+      firstRect,
+      toIdx,
+      boardNum,
+      duration,
+      // Store drop info so startSlideAnimation can find the button fresh from DOM
+      dropInfo: droppedPiece ? { position: move.position, piece: droppedPiece } : null
+    };
+
+    // Push state to LiveView — triggers DOM patch, then updated() callback
+    this.pushEvent("update_state", state);
+  },
+
+  /**
+   * Cancel any in-progress move animation without completing it.
+   * Used for seeks/jumps where the pending state is stale.
+   */
+  cancelMoveAnimation() {
+    this.pendingSlide = null;
+    if (this.moveAnimationTimer) {
+      clearTimeout(this.moveAnimationTimer);
+      this.moveAnimationTimer = null;
+    }
+    this.moveAnimating = false;
+    this.pendingAnimationFinish = null;
+
+    // Clean up any lingering animation styles
+    document.querySelectorAll('.replay-sliding').forEach(el => {
+      el.classList.remove('replay-sliding');
+      el.style.transition = '';
+      el.style.transform = '';
+      // Restore overflow on parent square
+      if (el.parentElement) {
+        el.parentElement.style.overflow = '';
+      }
+    });
+  },
+
+  /**
+   * Instantly complete the current animation (snap piece to final position).
+   * Used when the next sequential move arrives before the current
+   * animation finishes (e.g. rapid engine moves).
+   */
+  finishCurrentAnimation() {
+    if (this.pendingSlide) {
+      // Animation was waiting for DOM update — just skip it
+      this.pendingSlide = null;
+      this.moveAnimating = false;
+      return;
+    }
+    if (this.moveAnimationTimer) {
+      clearTimeout(this.moveAnimationTimer);
+      this.moveAnimationTimer = null;
+    }
+    if (this.pendingAnimationFinish) {
+      this.pendingAnimationFinish();
+    }
+  },
+
+  // ── Animation Helpers ───────────────────────────────────────────────
+
+  /**
+   * Get the grid container element for a board number
+   */
+  getBoardGrid(boardNum) {
+    const wrapper = document.getElementById(`replay-board-${boardNum}`);
+    return wrapper?.querySelector('[data-chess-board] > div');
+  },
+
+  /**
+   * Convert algebraic notation (e.g. "e4") to a CSS grid child index.
+   * Board 1 is unflipped, Board 2 is flipped.
+   */
+  algebraicToGridIndex(algebraic, isFlipped) {
+    const file = algebraic.charCodeAt(0) - 97; // a=0, h=7
+    const rank = parseInt(algebraic[1]);        // 1-8
+
+    if (isFlipped) {
+      // Flipped: rank 1 at top, file h on left
+      const row = rank - 1;
+      const col = 7 - file;
+      return row * 8 + col;
+    } else {
+      // Normal: rank 8 at top, file a on left
+      const row = 8 - rank;
+      const col = file;
+      return row * 8 + col;
+    }
+  },
+
+  /**
+   * Determine which piece type was dropped by comparing reserves before/after.
+   * Returns a lowercase letter ('p','n','b','r','q') or null.
+   */
+  getDroppedPieceType(oldMoveIndex, currentMove) {
+    const posKey = `${currentMove.position}_reserves`;
+    const prevReserves = oldMoveIndex >= 0
+      ? (this.moveHistory[oldMoveIndex][posKey] || [])
+      : [];
+    const newReserves = currentMove[posKey] || [];
+
+    const count = (arr) => {
+      const c = {};
+      arr.forEach(p => { c[p] = (c[p] || 0) + 1; });
+      return c;
+    };
+
+    const oldCounts = count(prevReserves);
+    const newCounts = count(newReserves);
+
+    for (const piece of ['q', 'r', 'b', 'n', 'p']) {
+      if ((oldCounts[piece] || 0) > (newCounts[piece] || 0)) {
+        return piece;
+      }
+    }
+    return null;
+  },
+
+  /**
+   * Read the piece at a given square from a FEN string.
+   * Returns a lowercase letter ('p','n','b','r','q','k') or null.
+   * Handles full FEN (with active color, castling, etc.) and BFEN (with brackets).
+   */
+  getPieceAtSquare(fen, algebraic) {
+    if (!fen || !algebraic || algebraic.length < 2) return null;
+    const file = algebraic.charCodeAt(0) - 97; // a=0, h=7
+    const rank = parseInt(algebraic[1]);        // 1-8
+    if (isNaN(rank) || file < 0 || file > 7) return null;
+    const row = 8 - rank;                       // FEN starts from rank 8
+
+    // Extract only the piece placement part:
+    // strip BFEN brackets and any FEN fields after a space
+    const placement = fen.split(/[\s[]/)[0];
+    const rows = placement.split('/');
+    if (row < 0 || row >= rows.length) return null;
+
+    const fenRow = rows[row];
+    if (!fenRow) return null;
+
+    let col = 0;
+    for (const ch of fenRow) {
+      if (ch >= '1' && ch <= '8') {
+        col += parseInt(ch);
+      } else if (ch === '~') {
+        // Skip promoted piece marker
+        continue;
+      } else {
+        if (col === file) return ch.toLowerCase();
+        col++;
+      }
+    }
+    return null;
+  },
+
+  /**
+   * Find the reserve piece button in the DOM for a given position and piece type.
+   * Navigates from the clock element (which has a known ID) to the reserves section.
+   */
+  findReservePieceButton(position, pieceLetter) {
+    return document.querySelector(`#reserves-${position} [phx-value-piece="${pieceLetter}"]`);
+  },
+
+  /**
+   * Find the reserves container element for a given position.
+   * Used as a fallback when the specific piece button can't be identified.
+   */
+  findReservesContainer(position) {
+    return document.getElementById(`reserves-${position}`);
   },
 
   /**
@@ -587,6 +970,7 @@ export const ReplayPlayer = {
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
     }
+    this.cancelMoveAnimation();
 
     // Remove event listeners
     if (this.keydownHandler) {

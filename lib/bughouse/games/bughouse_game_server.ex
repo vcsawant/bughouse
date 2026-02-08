@@ -8,6 +8,8 @@ defmodule Bughouse.Games.BughouseGameServer do
   use GenServer
   require Logger
 
+  import Ecto.Query
+
   alias Bughouse.Games
 
   defstruct [
@@ -46,8 +48,10 @@ defmodule Bughouse.Games.BughouseGameServer do
     :result_details,
     :result_timestamp,
 
-    # Draw offers
-    :draw_offers
+    # Voting
+    :draw_offers,
+    :resign_votes,
+    :bot_player_ids
   ]
 
   ## Public API
@@ -206,7 +210,9 @@ defmodule Bughouse.Games.BughouseGameServer do
         result_reason: nil,
         result_details: nil,
         result_timestamp: nil,
-        draw_offers: MapSet.new()
+        draw_offers: MapSet.new(),
+        resign_votes: MapSet.new(),
+        bot_player_ids: compute_bot_player_ids(game)
       }
 
       Logger.info("BughouseGameServer started for game #{game.invite_code}")
@@ -240,6 +246,7 @@ defmodule Bughouse.Games.BughouseGameServer do
           {:ok, :continue} ->
             new_state =
               state
+              |> clear_player_votes(player_id)
               |> handle_capture_if_any(capture_info, position)
               |> record_move(board_num, position, :move, move_notation)
               |> update_clocks_after_move(position)
@@ -295,6 +302,7 @@ defmodule Bughouse.Games.BughouseGameServer do
           {:ok, :continue} ->
             new_state =
               state
+              |> clear_player_votes(player_id)
               |> record_move(board_num, position, :drop, "#{piece_type}@#{square}")
               |> update_clocks_after_move(position)
               |> broadcast_state_update()
@@ -332,17 +340,28 @@ defmodule Bughouse.Games.BughouseGameServer do
       if position == nil do
         {:reply, {:error, :not_in_game}, state}
       else
-        # Determine which team resigned
         team = position_to_team(position)
-        winning_team = opposite_team(team)
+        new_votes = MapSet.put(state.resign_votes, player_id)
+        team_humans = team_human_player_ids(state, team)
 
-        new_state =
-          state
-          |> end_game(winning_team, :resignation, %{resigning_player: player_id})
-          |> persist_to_database()
-          |> broadcast_game_over()
+        if MapSet.subset?(team_humans, new_votes) do
+          # All human teammates agreed — team resigns
+          winning_team = opposite_team(team)
 
-        {:reply, :ok, new_state}
+          new_state =
+            %{state | resign_votes: new_votes}
+            |> end_game(winning_team, :resignation, %{resigning_player: player_id})
+            |> persist_to_database()
+            |> broadcast_game_over()
+
+          {:reply, :ok, new_state}
+        else
+          new_state =
+            %{state | resign_votes: new_votes}
+            |> broadcast_state_update()
+
+          {:reply, :ok, new_state}
+        end
       end
     end
   end
@@ -353,18 +372,10 @@ defmodule Bughouse.Games.BughouseGameServer do
       {:reply, {:error, :game_already_over}, state}
     else
       new_draw_offers = MapSet.put(state.draw_offers, player_id)
+      all_humans = all_human_player_ids(state)
 
-      # Check if all 4 players have offered draw
-      all_players =
-        MapSet.new([
-          state.board_1_white_id,
-          state.board_1_black_id,
-          state.board_2_white_id,
-          state.board_2_black_id
-        ])
-
-      if MapSet.equal?(new_draw_offers, all_players) do
-        # All players agreed to draw
+      if MapSet.subset?(all_humans, new_draw_offers) do
+        # All human players agreed to draw
         new_state =
           %{state | draw_offers: new_draw_offers}
           |> end_game(:draw, :agreement, %{})
@@ -373,7 +384,11 @@ defmodule Bughouse.Games.BughouseGameServer do
 
         {:reply, :ok, new_state}
       else
-        {:reply, :ok, %{state | draw_offers: new_draw_offers}}
+        new_state =
+          %{state | draw_offers: new_draw_offers}
+          |> broadcast_state_update()
+
+        {:reply, :ok, new_state}
       end
     end
   end
@@ -738,7 +753,8 @@ defmodule Bughouse.Games.BughouseGameServer do
     # Build completion attrs
     completion_attrs = %{
       result: result_string,
-      result_details: state.result_details,
+      result_details:
+        Map.put(state.result_details || %{}, :reason, to_string(state.result_reason)),
       result_timestamp: state.result_timestamp,
       final_board_1_fen: to_string(board_1_fen),
       final_board_2_fen: to_string(board_2_fen),
@@ -880,7 +896,27 @@ defmodule Bughouse.Games.BughouseGameServer do
       },
       last_move: List.first(state.move_history),
       result: state.result,
-      result_reason: state.result_reason
+      result_reason: state.result_reason,
+      # Voting state
+      resign_votes: %{
+        team_1: %{
+          count: count_team_resign_votes(state, :team_1),
+          needed: MapSet.size(team_human_player_ids(state, :team_1))
+        },
+        team_2: %{
+          count: count_team_resign_votes(state, :team_2),
+          needed: MapSet.size(team_human_player_ids(state, :team_2))
+        }
+      },
+      draw_votes: %{
+        count: MapSet.size(state.draw_offers),
+        needed: MapSet.size(all_human_player_ids(state)),
+        available:
+          MapSet.size(team_human_player_ids(state, :team_1)) > 0 and
+            MapSet.size(team_human_player_ids(state, :team_2)) > 0
+      },
+      voted_resign: MapSet.to_list(state.resign_votes),
+      voted_draw: MapSet.to_list(state.draw_offers)
     }
   end
 
@@ -895,6 +931,64 @@ defmodule Bughouse.Games.BughouseGameServer do
   end
 
   defp extract_piece_placement(fen), do: to_string(fen)
+
+  ## Bot & Voting Helpers
+
+  defp compute_bot_player_ids(game) do
+    all_ids =
+      [game.board_1_white_id, game.board_1_black_id, game.board_2_white_id, game.board_2_black_id]
+      |> Enum.filter(& &1)
+      |> Enum.uniq()
+
+    from(p in Bughouse.Schemas.Accounts.Player,
+      where: p.id in ^all_ids and p.is_bot == true,
+      select: p.id
+    )
+    |> Bughouse.Repo.all()
+    |> MapSet.new()
+  end
+
+  defp team_human_player_ids(state, :team_1) do
+    [state.board_1_white_id, state.board_2_black_id]
+    |> Enum.uniq()
+    |> Enum.reject(&MapSet.member?(state.bot_player_ids, &1))
+    |> MapSet.new()
+  end
+
+  defp team_human_player_ids(state, :team_2) do
+    [state.board_1_black_id, state.board_2_white_id]
+    |> Enum.uniq()
+    |> Enum.reject(&MapSet.member?(state.bot_player_ids, &1))
+    |> MapSet.new()
+  end
+
+  defp all_human_player_ids(state) do
+    [
+      state.board_1_white_id,
+      state.board_1_black_id,
+      state.board_2_white_id,
+      state.board_2_black_id
+    ]
+    |> Enum.filter(& &1)
+    |> Enum.uniq()
+    |> Enum.reject(&MapSet.member?(state.bot_player_ids, &1))
+    |> MapSet.new()
+  end
+
+  defp clear_player_votes(state, player_id) do
+    %{
+      state
+      | resign_votes: MapSet.delete(state.resign_votes, player_id),
+        draw_offers: MapSet.delete(state.draw_offers, player_id)
+    }
+  end
+
+  defp count_team_resign_votes(state, team) do
+    team_ids = team_human_player_ids(state, team)
+
+    state.resign_votes
+    |> Enum.count(&MapSet.member?(team_ids, &1))
+  end
 
   ## Child Spec
 

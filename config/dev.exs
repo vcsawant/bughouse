@@ -2,7 +2,8 @@ import Config
 
 # Bot engine: use debug build from sibling workspace
 config :bughouse, :bot_engine,
-  engine_path: Path.expand("../bughouse-engine/target/debug/bughouse_engine", __DIR__ |> Path.dirname()),
+  engine_path:
+    Path.expand("../bughouse-engine/target/debug/bughouse_engine", __DIR__ |> Path.dirname()),
   game_log_path: Path.expand("../priv/logs/engine", __DIR__)
 
 # Configure your database

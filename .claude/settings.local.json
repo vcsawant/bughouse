@@ -44,9 +44,7 @@
       "Bash(rebar3 ct:*)",
       "Bash(git commit:*)",
       "Bash(rustc:*)",
-      "Bash(cargo:*)",
-      "Bash(export PATH=\"$HOME/.cargo/bin:$PATH\")",
-      "Bash(export PATH:*)"
+      "Bash(cargo:*)"
     ]
   },
   "outputStyle": "Explanatory"

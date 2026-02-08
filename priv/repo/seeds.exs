@@ -13,7 +13,7 @@
 alias Bughouse.Repo
 alias Bughouse.Schemas.Accounts.{Player, Bot}
 
-# ── Internal Bot: BughouseEngine ──────────────────────────────────────
+# ── Internal Bot: Rusty ──────────────────────────────────────
 #
 # The Rust-based bughouse engine that runs as an Erlang Port.
 # Supports dual mode (plays both seats of a team).

@@ -829,6 +829,30 @@ Stay tuned for these exciting social features that will make it even easier to p
 
 ---
 
+### Settings Page
+
+All users (including guests) can customize their experience from a centralized Settings page.
+
+#### Accessing Settings
+
+- Click the gear icon in the navigation bar
+- Open the user menu and select "Settings"
+- Navigate directly to `/settings`
+
+#### Available Settings
+
+**Appearance:**
+- **App Theme** — Switch between System, Light, and Dark mode
+- **Board Theme** — Choose from 5 chess board color schemes: Classic, Green, Blue, Gray, and Purple
+- **Live Preview** — See your board theme applied to a sample chess position in real-time
+
+**Clock** (Coming Soon):
+- Clock customization options will be added in a future update
+
+All settings are saved to your browser's local storage, persist across sessions, and sync across browser tabs automatically.
+
+---
+
 ### Game Replay Viewer
 
 After a game ends, you can watch a full replay with video-like playback controls that recreate the game exactly as it was played.

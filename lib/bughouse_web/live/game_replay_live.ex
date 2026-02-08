@@ -207,7 +207,10 @@ defmodule BughouseWeb.GameReplayLive do
         <p class="text-base-content/70 mt-1">
           Game ID: <span class="font-mono">{@game.invite_code}</span>
           <span class="mx-2">•</span>
-          Result: <span class="font-semibold">{format_result(@game.result)}</span>
+          Result:
+          <span class="font-semibold">
+            {format_result(@game.result, @players, @game.result_details)}
+          </span>
         </p>
       </div>
       
@@ -231,8 +234,8 @@ defmodule BughouseWeb.GameReplayLive do
           </div>
           
     <!-- Chess Board -->
-          <div class="flex justify-center">
-            <.chess_board fen={@board_1_fen} size="lg" theme="classic" flip={false} />
+          <div id="replay-board-1" class="flex justify-center">
+            <.chess_board fen={@board_1_fen} size="lg" flip={false} />
           </div>
           
     <!-- Bottom player (White) with reserves -->
@@ -269,8 +272,8 @@ defmodule BughouseWeb.GameReplayLive do
           </div>
           
     <!-- Chess Board -->
-          <div class="flex justify-center">
-            <.chess_board fen={@board_2_fen} size="lg" theme="classic" flip={true} />
+          <div id="replay-board-2" class="flex justify-center">
+            <.chess_board fen={@board_2_fen} size="lg" flip={true} />
           </div>
           
     <!-- Bottom player (Black) with reserves -->
@@ -311,16 +314,60 @@ defmodule BughouseWeb.GameReplayLive do
         phx-hook="ReplayPlayer"
         data-moves={Jason.encode!(@move_history)}
         data-total-duration={@total_duration_ms}
+        data-state-version={@current_move_index}
         class="hidden"
       />
     </div>
     """
   end
 
-  defp format_result("team_1_wins"), do: "Team 1 Wins"
-  defp format_result("team_2_wins"), do: "Team 2 Wins"
-  defp format_result("draw"), do: "Draw"
-  defp format_result(_), do: "Unknown"
+  defp format_result(result, players, result_details) do
+    reason = get_reason_text(result_details)
+
+    case result do
+      "team_1_wins" ->
+        {names, verb} = format_team_names(players.board_1_white, players.board_2_black)
+        "#{names} #{verb} by #{reason}"
+
+      "team_2_wins" ->
+        {names, verb} = format_team_names(players.board_1_black, players.board_2_white)
+        "#{names} #{verb} by #{reason}"
+
+      "draw" ->
+        "Game drawn by #{reason}"
+
+      _ ->
+        "Unknown"
+    end
+  end
+
+  defp format_team_names(name, name) when name != nil, do: {name, "wins"}
+  defp format_team_names(nil, nil), do: {"Team", "wins"}
+  defp format_team_names(p1, nil), do: {p1, "wins"}
+  defp format_team_names(nil, p2), do: {p2, "wins"}
+  defp format_team_names(p1, p2), do: {"#{p1} and #{p2}", "win"}
+
+  defp get_reason_text(nil), do: "unknown"
+
+  defp get_reason_text(details) when is_map(details) do
+    reason = details["reason"] || Map.get(details, :reason)
+    format_reason_string(reason)
+  end
+
+  defp get_reason_text(_), do: "unknown"
+
+  defp format_reason_string("king_captured"), do: "king capture"
+  defp format_reason_string("timeout"), do: "timeout"
+  defp format_reason_string("checkmate"), do: "checkmate"
+  defp format_reason_string("resignation"), do: "resignation"
+  defp format_reason_string("agreement"), do: "mutual agreement"
+  defp format_reason_string("stalemate"), do: "stalemate"
+  defp format_reason_string("threefold_repetition"), do: "threefold repetition"
+  defp format_reason_string("fifty_move_rule"), do: "fifty-move rule"
+  defp format_reason_string("insufficient_material"), do: "insufficient material"
+  defp format_reason_string(nil), do: "unknown"
+  defp format_reason_string(reason) when is_binary(reason), do: reason
+  defp format_reason_string(reason), do: to_string(reason)
 
   defp calculate_progress(_current_move_index, []), do: 0.0
 

@@ -398,8 +398,20 @@ defmodule Bughouse.Games.BughouseGameServerTest do
   # ============================================================================
 
   describe "game endings - resignation" do
-    test "player can resign", %{pid: pid, players: players} do
+    test "single player resign vote doesn't end game", %{pid: pid, players: players} do
       assert :ok = BughouseGameServer.resign(pid, players.board_1_white)
+
+      state = TestHelpers.get_state(pid)
+      # Only 1 of 2 team_1 humans voted — game continues
+      assert state.result == nil
+      assert state.resign_votes.team_1.count == 1
+      assert state.resign_votes.team_1.needed == 2
+    end
+
+    test "both teammates resigning ends game", %{pid: pid, players: players} do
+      # team_1 = board_1_white + board_2_black
+      assert :ok = BughouseGameServer.resign(pid, players.board_1_white)
+      assert :ok = BughouseGameServer.resign(pid, players.board_2_black)
 
       state = TestHelpers.get_state(pid)
       assert state.result == :team_2
@@ -407,33 +419,39 @@ defmodule Bughouse.Games.BughouseGameServerTest do
     end
 
     test "returns error if player resigns after game over", %{pid: pid, players: players} do
+      # Both team_1 members resign
       BughouseGameServer.resign(pid, players.board_1_white)
+      BughouseGameServer.resign(pid, players.board_2_black)
 
       # Try to resign again
       assert {:error, :game_already_over} =
                BughouseGameServer.resign(pid, players.board_2_white)
     end
 
-    test "correct team wins when board 1 white resigns", %{pid: pid, players: players} do
+    test "correct team wins when team 1 resigns", %{pid: pid, players: players} do
+      # team_1 = board_1_white + board_2_black
       BughouseGameServer.resign(pid, players.board_1_white)
-
-      state = TestHelpers.get_state(pid)
-      # board_1_white is team_1, so team_2 wins
-      assert state.result == :team_2
-    end
-
-    test "correct team wins when board 2 black resigns", %{pid: pid, players: players} do
       BughouseGameServer.resign(pid, players.board_2_black)
 
       state = TestHelpers.get_state(pid)
-      # board_2_black is team_1, so team_2 wins
       assert state.result == :team_2
+    end
+
+    test "correct team wins when team 2 resigns", %{pid: pid, players: players} do
+      # team_2 = board_1_black + board_2_white
+      BughouseGameServer.resign(pid, players.board_1_black)
+      BughouseGameServer.resign(pid, players.board_2_white)
+
+      state = TestHelpers.get_state(pid)
+      assert state.result == :team_1
     end
 
     test "broadcasts game over on resignation", %{pid: pid, players: players, game: game} do
       TestHelpers.subscribe_to_game(game.invite_code)
 
+      # Both team_1 members must resign
       BughouseGameServer.resign(pid, players.board_1_white)
+      BughouseGameServer.resign(pid, players.board_2_black)
 
       assert_receive {:game_over, state}, 500
       assert state.result == :team_2
@@ -441,7 +459,9 @@ defmodule Bughouse.Games.BughouseGameServerTest do
     end
 
     test "persists game to database on resignation", %{pid: pid, players: players, game: game} do
+      # Both team_1 members must resign
       BughouseGameServer.resign(pid, players.board_1_white)
+      BughouseGameServer.resign(pid, players.board_2_black)
 
       # Allow time for persistence
       Process.sleep(100)
@@ -451,6 +471,20 @@ defmodule Bughouse.Games.BughouseGameServerTest do
       assert updated_game.status == :completed
       assert updated_game.result == "team_2_wins"
       assert updated_game.result_timestamp != nil
+    end
+
+    test "making a move clears resign vote", %{pid: pid, players: players} do
+      # Player votes to resign
+      BughouseGameServer.resign(pid, players.board_1_white)
+
+      state = TestHelpers.get_state(pid)
+      assert state.resign_votes.team_1.count == 1
+
+      # Player makes a move — vote should be cleared
+      BughouseGameServer.make_move(pid, players.board_1_white, "e2e4")
+
+      state = TestHelpers.get_state(pid)
+      assert state.resign_votes.team_1.count == 0
     end
   end
 
@@ -589,8 +623,9 @@ defmodule Bughouse.Games.BughouseGameServerTest do
 
   describe "error handling" do
     test "returns error when game already over", %{pid: pid, players: players} do
-      # End the game
+      # End the game (both team_1 members resign)
       BughouseGameServer.resign(pid, players.board_1_white)
+      BughouseGameServer.resign(pid, players.board_2_black)
 
       # Try to make a move
       assert {:error, :game_over} =
@@ -620,7 +655,9 @@ defmodule Bughouse.Games.BughouseGameServerTest do
     end
 
     test "cannot offer draw after game over", %{pid: pid, players: players} do
+      # Both team_1 members resign to end game
       BughouseGameServer.resign(pid, players.board_1_white)
+      BughouseGameServer.resign(pid, players.board_2_black)
 
       assert {:error, :game_already_over} =
                BughouseGameServer.offer_draw(pid, players.board_2_white)
@@ -739,7 +776,9 @@ defmodule Bughouse.Games.BughouseGameServerTest do
     test "broadcasts game over on resignation", %{pid: pid, players: players, game: game} do
       TestHelpers.subscribe_to_game(game.invite_code)
 
+      # Both team_1 members must resign
       BughouseGameServer.resign(pid, players.board_1_white)
+      BughouseGameServer.resign(pid, players.board_2_black)
 
       assert_receive {:game_over, state}, 500
       assert state.result == :team_2
@@ -801,13 +840,14 @@ defmodule Bughouse.Games.BughouseGameServerTest do
       refute state.board_2_fen =~ "rnbqkbnr/pppppppp"
     end
 
-    test "game ends when player resigns mid-game", %{pid: pid, players: players} do
+    test "game ends when both teammates resign mid-game", %{pid: pid, players: players} do
       # Make some moves
       BughouseGameServer.make_move(pid, players.board_1_white, "e2e4")
       BughouseGameServer.make_move(pid, players.board_1_black, "e7e5")
       BughouseGameServer.make_move(pid, players.board_2_white, "d2d4")
 
-      # Player resigns
+      # team_1 (board_1_white + board_2_black) both resign
+      BughouseGameServer.resign(pid, players.board_1_white)
       BughouseGameServer.resign(pid, players.board_2_black)
 
       state = TestHelpers.get_state(pid)

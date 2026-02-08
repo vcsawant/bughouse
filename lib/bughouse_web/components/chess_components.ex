@@ -108,12 +108,10 @@ defmodule BughouseWeb.ChessComponents do
       assigns
       |> assign(:board, display_board)
       |> assign(:size_class, size_class)
-      |> assign(:theme_attr, if(assigns.theme == "classic", do: nil, else: assigns.theme))
 
     ~H"""
     <div
       class={["inline-block", @class]}
-      data-chess-theme={@theme_attr}
       data-chess-board="true"
     >
       <div class={[
@@ -350,17 +348,17 @@ defmodule BughouseWeb.ChessComponents do
   """
   def chess_board_theme_selector(assigns) do
     ~H"""
-    <div class="flex flex-wrap gap-2 items-center">
-      <span class="text-sm font-medium">Board Theme:</span>
+    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full w-fit">
+      <div class="absolute w-1/5 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-chess-theme=green]_&]:left-[20%] [[data-chess-theme=blue]_&]:left-[40%] [[data-chess-theme=gray]_&]:left-[60%] [[data-chess-theme=purple]_&]:left-[80%] transition-[left]" />
 
       <button
         type="button"
-        class="btn btn-sm btn-ghost"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
         phx-click={JS.dispatch("phx:set-chess-theme")}
         data-phx-chess-theme="classic"
         title="Classic Brown"
       >
-        <div class="w-6 h-6 rounded border-2 border-base-300 grid grid-cols-2 grid-rows-2">
+        <div class="w-5 h-5 rounded-sm grid grid-cols-2 grid-rows-2 opacity-75 hover:opacity-100">
           <div class="bg-[oklch(85%_0.05_72)]"></div>
           <div class="bg-[oklch(55%_0.06_62)]"></div>
           <div class="bg-[oklch(55%_0.06_62)]"></div>
@@ -370,12 +368,12 @@ defmodule BughouseWeb.ChessComponents do
 
       <button
         type="button"
-        class="btn btn-sm btn-ghost"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
         phx-click={JS.dispatch("phx:set-chess-theme")}
         data-phx-chess-theme="green"
         title="Tournament Green"
       >
-        <div class="w-6 h-6 rounded border-2 border-base-300 grid grid-cols-2 grid-rows-2">
+        <div class="w-5 h-5 rounded-sm grid grid-cols-2 grid-rows-2 opacity-75 hover:opacity-100">
           <div class="bg-[oklch(95%_0.02_120)]"></div>
           <div class="bg-[oklch(60%_0.15_145)]"></div>
           <div class="bg-[oklch(60%_0.15_145)]"></div>
@@ -385,12 +383,12 @@ defmodule BughouseWeb.ChessComponents do
 
       <button
         type="button"
-        class="btn btn-sm btn-ghost"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
         phx-click={JS.dispatch("phx:set-chess-theme")}
         data-phx-chess-theme="blue"
         title="Ocean Blue"
       >
-        <div class="w-6 h-6 rounded border-2 border-base-300 grid grid-cols-2 grid-rows-2">
+        <div class="w-5 h-5 rounded-sm grid grid-cols-2 grid-rows-2 opacity-75 hover:opacity-100">
           <div class="bg-[oklch(93%_0.02_240)]"></div>
           <div class="bg-[oklch(50%_0.15_240)]"></div>
           <div class="bg-[oklch(50%_0.15_240)]"></div>
@@ -400,12 +398,12 @@ defmodule BughouseWeb.ChessComponents do
 
       <button
         type="button"
-        class="btn btn-sm btn-ghost"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
         phx-click={JS.dispatch("phx:set-chess-theme")}
         data-phx-chess-theme="gray"
         title="Modern Gray"
       >
-        <div class="w-6 h-6 rounded border-2 border-base-300 grid grid-cols-2 grid-rows-2">
+        <div class="w-5 h-5 rounded-sm grid grid-cols-2 grid-rows-2 opacity-75 hover:opacity-100">
           <div class="bg-[oklch(90%_0_0)]"></div>
           <div class="bg-[oklch(50%_0_0)]"></div>
           <div class="bg-[oklch(50%_0_0)]"></div>
@@ -415,12 +413,12 @@ defmodule BughouseWeb.ChessComponents do
 
       <button
         type="button"
-        class="btn btn-sm btn-ghost"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
         phx-click={JS.dispatch("phx:set-chess-theme")}
         data-phx-chess-theme="purple"
         title="Royal Purple"
       >
-        <div class="w-6 h-6 rounded border-2 border-base-300 grid grid-cols-2 grid-rows-2">
+        <div class="w-5 h-5 rounded-sm grid grid-cols-2 grid-rows-2 opacity-75 hover:opacity-100">
           <div class="bg-[oklch(92%_0.03_300)]"></div>
           <div class="bg-[oklch(45%_0.15_300)]"></div>
           <div class="bg-[oklch(45%_0.15_300)]"></div>
@@ -466,8 +464,8 @@ defmodule BughouseWeb.ChessComponents do
         />
       </div>
       
-    <!-- Reserve Pieces (right-aligned) -->
-      <div class="flex-1 flex justify-end">
+    <!-- Reserve Pieces (centered) -->
+      <div class="flex-1 flex justify-center" id={"reserves-#{@position}"}>
         <.reserve_pieces
           pieces={@reserves}
           can_select={@can_select}
@@ -841,6 +839,83 @@ defmodule BughouseWeb.ChessComponents do
   end
 
   @doc """
+  Resign and draw voting buttons shown between player headers.
+
+  Resign is team-scoped (only your team row), draw is game-scoped (shown
+  in your team row). Buttons show vote counts when > 0 and are disabled
+  after you've voted. Hidden for spectators and when game is over.
+
+  ## Attributes
+
+    * `team` - Which team row this is in (:team_1 or :team_2)
+    * `my_team` - Current player's team
+    * `my_player_id` - Current player's ID
+    * `game_state` - Current game state map from server
+  """
+  attr :team, :atom, required: true
+  attr :my_team, :atom, required: true
+  attr :my_player_id, :string, required: true
+  attr :game_state, :map, required: true
+
+  def game_action_buttons(assigns) do
+    is_my_team = assigns.team == assigns.my_team
+    my_voted_resign = assigns.my_player_id in assigns.game_state.voted_resign
+    my_voted_draw = assigns.my_player_id in assigns.game_state.voted_draw
+    resign_data = assigns.game_state.resign_votes[assigns.team]
+    draw_data = assigns.game_state.draw_votes
+
+    assigns =
+      assigns
+      |> assign(:is_my_team, is_my_team)
+      |> assign(:my_voted_resign, my_voted_resign)
+      |> assign(:my_voted_draw, my_voted_draw)
+      |> assign(:resign_data, resign_data)
+      |> assign(:draw_data, draw_data)
+
+    ~H"""
+    <div class="flex flex-col gap-1 flex-shrink-0">
+      <%= if @is_my_team do %>
+        <button
+          type="button"
+          phx-click="vote_resign"
+          disabled={@my_voted_resign}
+          class={[
+            "btn btn-sm btn-outline btn-error",
+            @my_voted_resign && "btn-disabled opacity-50"
+          ]}
+        >
+          Resign
+          <%= if @resign_data.count > 0 do %>
+            <span class="badge badge-sm badge-error">
+              {@resign_data.count}/{@resign_data.needed}
+            </span>
+          <% end %>
+        </button>
+      <% end %>
+
+      <%= if @is_my_team and @draw_data.available do %>
+        <button
+          type="button"
+          phx-click="vote_draw"
+          disabled={@my_voted_draw}
+          class={[
+            "btn btn-sm btn-outline btn-warning",
+            @my_voted_draw && "btn-disabled opacity-50"
+          ]}
+        >
+          Draw
+          <%= if @draw_data.count > 0 do %>
+            <span class="badge badge-sm badge-warning">
+              {@draw_data.count}/{@draw_data.needed}
+            </span>
+          <% end %>
+        </button>
+      <% end %>
+    </div>
+    """
+  end
+
+  @doc """
   Game result modal displayed when the game ends.
 
   Shows the winning team, result reason, and provides navigation back to home.
@@ -858,6 +933,7 @@ defmodule BughouseWeb.ChessComponents do
   attr :result, :atom, required: true
   attr :result_reason, :string, required: true
   attr :my_team, :atom, default: nil
+  attr :invite_code, :string, required: true
   attr :team_1_white, :string, default: nil
   attr :team_1_black, :string, default: nil
   attr :team_2_white, :string, default: nil
@@ -892,8 +968,11 @@ defmodule BughouseWeb.ChessComponents do
           )}
         </p>
 
-        <div class="modal-action justify-center">
-          <.link navigate={~p"/"} class="btn btn-primary btn-lg">
+        <div class="modal-action justify-center gap-4">
+          <.link navigate={~p"/game/view/#{@invite_code}"} class="btn btn-primary btn-lg">
+            View Game
+          </.link>
+          <.link navigate={~p"/"} class="btn btn-ghost btn-lg">
             Back to Home
           </.link>
         </div>
@@ -935,9 +1014,9 @@ defmodule BughouseWeb.ChessComponents do
   end
 
   defp format_win_message(player1, player2, reason) do
-    names = format_player_names(player1, player2)
+    {names, verb} = format_player_names(player1, player2)
     reason_text = format_reason(reason)
-    "#{names} win by #{reason_text}!"
+    "#{names} #{verb} by #{reason_text}!"
   end
 
   defp format_draw_message(reason) do
@@ -945,10 +1024,12 @@ defmodule BughouseWeb.ChessComponents do
     "Game drawn by #{reason_text}."
   end
 
-  defp format_player_names(nil, nil), do: "Team"
-  defp format_player_names(p1, nil), do: p1
-  defp format_player_names(nil, p2), do: p2
-  defp format_player_names(p1, p2), do: "#{p1} and #{p2}"
+  # Returns {display_name, verb} — singular "wins" for one name, plural "win" for two
+  defp format_player_names(nil, nil), do: {"Team", "wins"}
+  defp format_player_names(p1, nil), do: {p1, "wins"}
+  defp format_player_names(nil, p2), do: {p2, "wins"}
+  defp format_player_names(name, name), do: {name, "wins"}
+  defp format_player_names(p1, p2), do: {"#{p1} and #{p2}", "win"}
 
   defp format_reason("king_captured"), do: "king capture"
   defp format_reason("timeout"), do: "timeout"

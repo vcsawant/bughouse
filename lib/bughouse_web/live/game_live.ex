@@ -261,6 +261,28 @@ defmodule BughouseWeb.GameLive do
   end
 
   @impl true
+  def handle_event("vote_resign", _params, socket) do
+    player_id = get_my_player_id(socket)
+
+    if player_id do
+      Games.resign_game(socket.assigns.game.id, player_id)
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("vote_draw", _params, socket) do
+    player_id = get_my_player_id(socket)
+
+    if player_id do
+      Games.offer_game_draw(socket.assigns.game.id, player_id)
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info({:game_state_update, new_state}, socket) do
     {:noreply, assign(socket, game_state: new_state)}
   end
@@ -336,6 +358,20 @@ defmodule BughouseWeb.GameLive do
     end
   end
 
+  defp get_my_player_id(%Phoenix.LiveView.Socket{} = socket) do
+    get_my_player_id(socket.assigns)
+  end
+
+  defp get_my_player_id(%{game: game, my_position: my_position}) do
+    case my_position do
+      :board_1_white -> game.board_1_white_id
+      :board_1_black -> game.board_1_black_id
+      :board_2_white -> game.board_2_white_id
+      :board_2_black -> game.board_2_black_id
+      nil -> nil
+    end
+  end
+
   defp find_my_position(game, player_id) do
     cond do
       game.board_1_white_id == player_id -> :board_1_white
@@ -398,19 +434,33 @@ defmodule BughouseWeb.GameLive do
         </div>
       <% end %>
       <!-- Team 2 Header (Top) -->
-      <div class="grid grid-cols-2 gap-8 mb-2">
-        <.player_header
-          position={:board_1_black}
-          player_name={get_player_name(@players, @game.board_1_black_id)}
-          my_position={@my_position}
-          is_active={:board_1_black in @game_state.active_clocks}
-        />
-        <.player_header
-          position={:board_2_white}
-          player_name={get_player_name(@players, @game.board_2_white_id)}
-          my_position={@my_position}
-          is_active={:board_2_white in @game_state.active_clocks}
-        />
+      <div class="flex items-center gap-8 mb-2">
+        <div class="flex-1">
+          <.player_header
+            position={:board_1_black}
+            player_name={get_player_name(@players, @game.board_1_black_id)}
+            my_position={@my_position}
+            is_active={:board_1_black in @game_state.active_clocks}
+          />
+        </div>
+
+        <%= if @my_position != nil and @game_state.result == nil do %>
+          <.game_action_buttons
+            team={:team_2}
+            my_team={@my_team}
+            my_player_id={get_my_player_id(assigns)}
+            game_state={@game_state}
+          />
+        <% end %>
+
+        <div class="flex-1">
+          <.player_header
+            position={:board_2_white}
+            player_name={get_player_name(@players, @game.board_2_white_id)}
+            my_position={@my_position}
+            is_active={:board_2_white in @game_state.active_clocks}
+          />
+        </div>
       </div>
       
     <!-- Team 2 Clocks and Reserves (Above boards) -->
@@ -482,19 +532,33 @@ defmodule BughouseWeb.GameLive do
       </div>
       
     <!-- Team 1 Header (Bottom) -->
-      <div class="grid grid-cols-2 gap-8 mb-4">
-        <.player_header
-          position={:board_1_white}
-          player_name={get_player_name(@players, @game.board_1_white_id)}
-          my_position={@my_position}
-          is_active={:board_1_white in @game_state.active_clocks}
-        />
-        <.player_header
-          position={:board_2_black}
-          player_name={get_player_name(@players, @game.board_2_black_id)}
-          my_position={@my_position}
-          is_active={:board_2_black in @game_state.active_clocks}
-        />
+      <div class="flex items-center gap-8 mb-4">
+        <div class="flex-1">
+          <.player_header
+            position={:board_1_white}
+            player_name={get_player_name(@players, @game.board_1_white_id)}
+            my_position={@my_position}
+            is_active={:board_1_white in @game_state.active_clocks}
+          />
+        </div>
+
+        <%= if @my_position != nil and @game_state.result == nil do %>
+          <.game_action_buttons
+            team={:team_1}
+            my_team={@my_team}
+            my_player_id={get_my_player_id(assigns)}
+            game_state={@game_state}
+          />
+        <% end %>
+
+        <div class="flex-1">
+          <.player_header
+            position={:board_2_black}
+            player_name={get_player_name(@players, @game.board_2_black_id)}
+            my_position={@my_position}
+            is_active={:board_2_black in @game_state.active_clocks}
+          />
+        </div>
       </div>
       
     <!-- Deselect button (only visible when something is selected) -->
@@ -516,6 +580,7 @@ defmodule BughouseWeb.GameLive do
           result={@game_state.result}
           result_reason={@game_state.result_reason}
           my_team={@my_team}
+          invite_code={@invite_code}
           team_1_white={get_player_name(@players, @game.board_1_white_id)}
           team_1_black={get_player_name(@players, @game.board_2_black_id)}
           team_2_white={get_player_name(@players, @game.board_2_white_id)}

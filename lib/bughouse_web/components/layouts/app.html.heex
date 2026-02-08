@@ -8,19 +8,15 @@
     </div>
 
     <div class="flex-none">
-      <ul class="menu menu-horizontal px-1 gap-2">
-        <li>
-          <a href={~p"/game/new"} class="btn btn-ghost btn-sm">
-            New Game
-          </a>
-        </li>
-        <li>
-          <.user_menu current_player={@current_player} />
-        </li>
-        <li>
-          <.theme_toggle />
-        </li>
-      </ul>
+      <div class="flex items-center gap-2">
+        <a href={~p"/game/new"} class="btn btn-ghost btn-sm">
+          New Game
+        </a>
+        <.user_menu current_player={@current_player} />
+        <.link navigate={~p"/settings"} class="btn btn-ghost btn-sm" title="Settings">
+          <.icon name="hero-cog-6-tooth" class="size-6" />
+        </.link>
+      </div>
     </div>
   </nav>
   
