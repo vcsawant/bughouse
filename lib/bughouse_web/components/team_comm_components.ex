@@ -3,7 +3,7 @@ defmodule BughouseWeb.TeamCommComponents do
   Components for in-game team communication.
 
   Renders the quick-comm panel between the two chess boards,
-  allowing teammates to send BUP-protocol tactical signals:
+  allowing teammates to send UBI-protocol tactical signals:
   piece requests, stall, hurry, and threat alerts.
 
   Also renders ephemeral toast notifications for incoming messages.

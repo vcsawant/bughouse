@@ -69,7 +69,9 @@ defmodule BughouseWeb.GameLive do
                 "to team #{inspect(my_tm)} for game #{code} (pos=#{inspect(my_pos)})"
             )
           else
-            Logger.warning("TeamComm: player #{current_player.id} has no team (pos=#{inspect(my_pos)})")
+            Logger.warning(
+              "TeamComm: player #{current_player.id} has no team (pos=#{inspect(my_pos)})"
+            )
           end
 
           Logger.debug("GameLive: Subscribed to game:#{code}")

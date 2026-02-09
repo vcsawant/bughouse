@@ -51,50 +51,50 @@ defmodule Bughouse.TeamCommTest do
     end
   end
 
-  describe "to_bup_partnermsg/1" do
+  describe "to_ubi_partnermsg/1" do
     test "serializes need with urgency" do
       msg = TeamComm.build_message(:need, %{piece: "n", urgency: :high}, "p1", :board_1_white)
-      assert TeamComm.to_bup_partnermsg(msg) == "partnermsg need n urgency high"
+      assert TeamComm.to_ubi_partnermsg(msg) == "partnermsg need n urgency high"
     end
 
     test "serializes need without urgency" do
       msg = TeamComm.build_message(:need, %{piece: "q"}, "p1", :board_1_white)
-      assert TeamComm.to_bup_partnermsg(msg) == "partnermsg need q"
+      assert TeamComm.to_ubi_partnermsg(msg) == "partnermsg need q"
     end
 
     test "serializes stall with duration" do
       msg = TeamComm.build_message(:stall, %{duration: 2}, "p1", :board_1_white)
-      assert TeamComm.to_bup_partnermsg(msg) == "partnermsg stall duration 2"
+      assert TeamComm.to_ubi_partnermsg(msg) == "partnermsg stall duration 2"
     end
 
     test "serializes stall without duration" do
       msg = TeamComm.build_message(:stall, %{}, "p1", :board_1_white)
-      assert TeamComm.to_bup_partnermsg(msg) == "partnermsg stall"
+      assert TeamComm.to_ubi_partnermsg(msg) == "partnermsg stall"
     end
 
     test "serializes play_fast with reason" do
       msg = TeamComm.build_message(:play_fast, %{reason: :time}, "p1", :board_1_white)
-      assert TeamComm.to_bup_partnermsg(msg) == "partnermsg play_fast reason time"
+      assert TeamComm.to_ubi_partnermsg(msg) == "partnermsg play_fast reason time"
     end
 
     test "serializes play_fast without reason" do
       msg = TeamComm.build_message(:play_fast, %{}, "p1", :board_1_white)
-      assert TeamComm.to_bup_partnermsg(msg) == "partnermsg play_fast"
+      assert TeamComm.to_ubi_partnermsg(msg) == "partnermsg play_fast"
     end
 
     test "serializes material" do
       msg = TeamComm.build_message(:material, %{value: 350}, "p1", :board_1_white)
-      assert TeamComm.to_bup_partnermsg(msg) == "partnermsg material 350"
+      assert TeamComm.to_ubi_partnermsg(msg) == "partnermsg material 350"
     end
 
     test "serializes negative material" do
       msg = TeamComm.build_message(:material, %{value: -150}, "p1", :board_1_white)
-      assert TeamComm.to_bup_partnermsg(msg) == "partnermsg material -150"
+      assert TeamComm.to_ubi_partnermsg(msg) == "partnermsg material -150"
     end
 
     test "serializes threat" do
       msg = TeamComm.build_message(:threat, %{level: :critical}, "p1", :board_1_white)
-      assert TeamComm.to_bup_partnermsg(msg) == "partnermsg threat critical"
+      assert TeamComm.to_ubi_partnermsg(msg) == "partnermsg threat critical"
     end
   end
 

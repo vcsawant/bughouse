@@ -20,7 +20,7 @@ defmodule Bughouse.Schemas.Accounts.Bot do
     field :single_rating, :integer, default: 1200
     field :dual_rating, :integer, default: 1200
 
-    # engine config passed to BUP
+    # engine config passed to UBI
     field :config, :map, default: %{}
 
     timestamps(type: :utc_datetime)

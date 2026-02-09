@@ -120,7 +120,7 @@ This creates a unique dynamic where players must balance their own game while co
   - Leaderboards
 
 - [ ] **Communication**
-  - [x] In-game team signals (BUP-based quick-comm: piece requests, stall, hurry, threat)
+  - [x] In-game team signals (UBI-based quick-comm: piece requests, stall, hurry, threat)
   - [ ] Post-game chat room
   - [ ] Emotes/quick reactions
   - [ ] Team voice chat integration (future)
@@ -147,7 +147,7 @@ This creates a unique dynamic where players must balance their own game while co
   - [x] Hard fail: game refuses to start if bot engine limit would be exceeded
   - [ ] Health check system — external bots must be alive to join a game
 
-- [x] **BUP — Bughouse Universal Protocol**
+- [x] **UBI — Universal Bughouse Interface**
   - [x] Standardized stdin/stdout protocol for bughouse engines (modeled after UCI)
   - [x] Supports two-board state, four clocks, reserves via BFEN
   - [x] Internal bots connect via Erlang Port (BotEngineServer GenServer)
@@ -156,7 +156,7 @@ This creates a unique dynamic where players must balance their own game while co
 
 - [x] **Rust-Based Bughouse Engine (Phase B — Random Move Bot)**
   - [x] Move generation library ([bughouse-chess](../bughouse-chess/)) — bitboard-based, BFEN parsing, reserves, drops, promoted-piece tracking
-  - [x] Engine binary ([bughouse-engine](../bughouse-engine/)) — BUP protocol, random move selection, 46 unit tests
+  - [x] Engine binary ([bughouse-engine](../bughouse-engine/)) — UBI protocol, random move selection, 46 unit tests
   - [ ] Iterative deepening with alpha-beta pruning (Phase D)
   - [ ] Bughouse-specific scoring: reserves, drop threats, clock pressure (Phase C-E)
   - [ ] Parallel root search with Rayon
@@ -193,7 +193,7 @@ This creates a unique dynamic where players must balance their own game while co
 - **Domain** - Custom domain with SSL
 
 **Bot Engine:**
-- **Rust** - [bughouse-engine](../bughouse-engine/) binary speaking BUP protocol via Erlang Port — see [BUGHOUSE_ENGINE_INTEGRATION.md](./BUGHOUSE_ENGINE_INTEGRATION.md)
+- **Rust** - [bughouse-engine](../bughouse-engine/) binary speaking UBI protocol via Erlang Port — see [BUGHOUSE_ENGINE_INTEGRATION.md](./BUGHOUSE_ENGINE_INTEGRATION.md)
 - **[bughouse-chess](../bughouse-chess/)** - Rust move generation library (bitboard-based, BFEN, reserves, drops)
 
 **Planned:**
@@ -426,7 +426,7 @@ events:
 ```elixir
 topic: "game:#{invite_code}:team_1" | "game:#{invite_code}:team_2"
 events:
-  - team_message (BUP protocol: need, stall, play_fast, material, threat)
+  - team_message (UBI protocol: need, stall, play_fast, material, threat)
 ```
 
 **Lobby Updates:**
@@ -736,7 +736,7 @@ The engine binary path is resolved at boot time. In dev, it points to the debug 
 1. Players add a bot to a team in the lobby
 2. When the game starts, `Games.start_game/1` detects bot players and checks the concurrency limit
 3. If under the limit, a `BotEngineServer` GenServer spawns per bot, opening an Erlang Port to the engine binary
-4. The BotEngineServer subscribes to game PubSub, sends BUP commands when it's the bot's turn, and plays the returned `bestmove` via the Games API
+4. The BotEngineServer subscribes to game PubSub, sends UBI commands when it's the bot's turn, and plays the returned `bestmove` via the Games API
 5. When the game ends, the engine process exits cleanly
 
 ### Google OAuth Authentication Setup
@@ -1012,7 +1012,7 @@ lib/
 │   │   └── user_token.ex
 │   ├── bot_engine/            # Bot engine integration
 │   │   ├── supervisor.ex      # DynamicSupervisor with concurrency limit
-│   │   └── server.ex          # GenServer: Port owner, BUP translator
+│   │   └── server.ex          # GenServer: Port owner, UBI translator
 │   ├── games/                 # Game management
 │   │   ├── game.ex
 │   │   └── game_server.ex
@@ -1139,7 +1139,7 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ### Q4 2026 / 2027
 - [ ] Bot registry + lobby integration (Phase 4A)
-- [ ] BUP protocol + Rust engine first cut (Phase 4B-C)
+- [ ] UBI protocol + Rust engine first cut (Phase 4B-C)
 - [ ] Engine heuristics iteration (Phase 4D)
 - [ ] Bot-only games + rankings (Phase 4E)
 - [ ] Advanced features (voice chat, etc.)

@@ -2,11 +2,11 @@ defmodule Bughouse.TeamComm do
   @moduledoc """
   Team-scoped communication for in-game teammate coordination.
 
-  Maps directly to BUP protocol `teammsg`/`partnermsg` types.
+  Maps directly to UBI protocol `teammsg`/`partnermsg` types.
   Human players send messages via the UI, bots send via the engine protocol.
   Both flow through team-scoped PubSub topics so only teammates can see them.
 
-  ## BUP Message Types
+  ## UBI Message Types
 
     * `need` — Request a specific piece (p, n, b, r, q) with optional urgency
     * `stall` — Ask teammate to avoid captures temporarily
@@ -61,44 +61,44 @@ defmodule Bughouse.TeamComm do
     }
   end
 
-  # --- BUP Serialization (message → partnermsg string) ---
+  # --- UBI Serialization (message → partnermsg string) ---
 
   @doc """
-  Serializes a team message to a BUP `partnermsg` command string.
+  Serializes a team message to a UBI `partnermsg` command string.
 
   ## Examples
 
       iex> msg = TeamComm.build_message(:need, %{piece: "n", urgency: :high}, "p1", :board_1_white)
-      iex> TeamComm.to_bup_partnermsg(msg)
+      iex> TeamComm.to_ubi_partnermsg(msg)
       "partnermsg need n urgency high"
   """
-  def to_bup_partnermsg(%{type: :need, params: params}) do
+  def to_ubi_partnermsg(%{type: :need, params: params}) do
     base = "partnermsg need #{params.piece}"
     if params[:urgency], do: base <> " urgency #{params.urgency}", else: base
   end
 
-  def to_bup_partnermsg(%{type: :stall, params: params}) do
+  def to_ubi_partnermsg(%{type: :stall, params: params}) do
     base = "partnermsg stall"
     if params[:duration], do: base <> " duration #{params.duration}", else: base
   end
 
-  def to_bup_partnermsg(%{type: :play_fast, params: params}) do
+  def to_ubi_partnermsg(%{type: :play_fast, params: params}) do
     base = "partnermsg play_fast"
     if params[:reason], do: base <> " reason #{params.reason}", else: base
   end
 
-  def to_bup_partnermsg(%{type: :material, params: params}) do
+  def to_ubi_partnermsg(%{type: :material, params: params}) do
     "partnermsg material #{params.value}"
   end
 
-  def to_bup_partnermsg(%{type: :threat, params: params}) do
+  def to_ubi_partnermsg(%{type: :threat, params: params}) do
     "partnermsg threat #{params.level}"
   end
 
-  # --- BUP Parsing (teammsg string → message) ---
+  # --- UBI Parsing (teammsg string → message) ---
 
   @doc """
-  Parses a BUP `teammsg` line from an engine into a structured message.
+  Parses a UBI `teammsg` line from an engine into a structured message.
 
   ## Examples
 

@@ -3,7 +3,7 @@ defmodule Bughouse.BotEngine.Server do
   GenServer that owns an Erlang Port to the bughouse-engine Rust binary.
 
   Subscribes to game PubSub as an independent observer (same pattern as GameLive).
-  When it's the bot's turn, it fetches full BFEN from the GameServer, sends BUP
+  When it's the bot's turn, it fetches full BFEN from the GameServer, sends UBI
   commands to the engine, and plays the returned `bestmove` via the Games API.
 
   One instance per bot per game — a dual bot (both team seats) is still one process.
@@ -76,8 +76,8 @@ defmodule Bughouse.BotEngine.Server do
       line_buffer: ""
     }
 
-    # Start BUP handshake
-    send_to_engine(port, "bup")
+    # Start UBI handshake
+    send_to_engine(port, "ubi")
 
     Logger.info(
       "BotEngineServer started for game #{invite_code}, " <>
@@ -126,11 +126,11 @@ defmodule Bughouse.BotEngine.Server do
     {:noreply, state}
   end
 
-  # Team communication from human teammate — forward as BUP partnermsg to engine
+  # Team communication from human teammate — forward as UBI partnermsg to engine
   def handle_info({:team_message, message}, state) do
     if message.from_player_id != state.bot_player_id and state.port != nil do
-      bup_line = TeamComm.to_bup_partnermsg(message)
-      send_to_engine(state.port, bup_line)
+      ubi_line = TeamComm.to_ubi_partnermsg(message)
+      send_to_engine(state.port, ubi_line)
     end
 
     {:noreply, state}
@@ -161,13 +161,13 @@ defmodule Bughouse.BotEngine.Server do
     :ok
   end
 
-  ## Engine Line Handling (BUP protocol)
+  ## Engine Line Handling (UBI protocol)
 
   defp handle_engine_line("", state), do: state
 
-  defp handle_engine_line("bupok", state) do
+  defp handle_engine_line("ubiok", state) do
     # Handshake complete — set up new game and check readiness
-    send_to_engine(state.port, "bupnewgame")
+    send_to_engine(state.port, "ubinewgame")
     send_to_engine(state.port, "isready")
     state
   end
@@ -287,8 +287,8 @@ defmodule Bughouse.BotEngine.Server do
           "clock black_B #{round(clocks.board_2_black)}"
         )
 
-        # Determine BUP board id from position
-        board_id = position_to_bup_board(position)
+        # Determine UBI board id from position
+        board_id = position_to_ubi_board(position)
         send_to_engine(state.port, "go board #{board_id}")
 
         %{state | pending_go: position}
@@ -350,8 +350,8 @@ defmodule Bughouse.BotEngine.Server do
     byte_size(move_str) >= 3 and String.at(move_str, 1) == "@"
   end
 
-  defp position_to_bup_board(position) when position in [:board_1_white, :board_1_black], do: "A"
-  defp position_to_bup_board(position) when position in [:board_2_white, :board_2_black], do: "B"
+  defp position_to_ubi_board(position) when position in [:board_1_white, :board_1_black], do: "A"
+  defp position_to_ubi_board(position) when position in [:board_2_white, :board_2_black], do: "B"
 
   defp get_bot_active_position(state) do
     # Return the position the bot is currently thinking about, or the first position

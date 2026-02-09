@@ -9,7 +9,7 @@ A living reference document for the design, protocol, and phased implementation 
 1. [Vision](#vision)
 2. [Architecture Overview](#architecture-overview)
 3. [Bot Types & Registration](#bot-types--registration)
-4. [BUP — Bughouse Universal Protocol](#bup--bughouse-universal-protocol)
+4. [UBI — Universal Bughouse Interface](#ubi--universal-bughouse-interface)
 5. [Integration with Existing Game Loop](#integration-with-existing-game-loop)
 6. [Evaluation & Heuristics](#evaluation--heuristics)
 7. [Rust Engine Architecture](#rust-engine-architecture)
@@ -25,7 +25,7 @@ Bughouse is one of the most interesting domains for engine development because t
 
 The goal is threefold:
 
-1. **Build a standardized bot protocol (BUP)** so that anyone — internal or external — can write a bughouse engine and connect it to this platform, similar to how UCI works for standard chess engines.
+1. **Build a standardized bot protocol (UBI)** so that anyone — internal or external — can write a bughouse engine and connect it to this platform, similar to how UCI works for standard chess engines.
 2. **Write a Rust-based bughouse engine** that explores move-tree search, parallel evaluation, and bughouse-specific heuristics as a learning project in systems programming.
 3. **Create an ecosystem** where bots can fill lobby slots alongside humans, play each other in bot-only games, and have their own rankings — making the platform a testbed for engine development.
 
@@ -40,8 +40,8 @@ The bot system is layered. Each layer has a clear boundary and can be developed 
 │  LAYER 4: ENGINE HEURISTICS  (Rust)                         │
 │  Search trees, scoring functions, time management          │
 ├─────────────────────────────────────────────────────────────┤
-│  LAYER 3: BUP PROTOCOL  (Rust stdin/stdout + spec)          │
-│  Bughouse Universal Protocol — the UCI equivalent           │
+│  LAYER 3: UBI PROTOCOL  (Rust stdin/stdout + spec)          │
+│  Universal Bughouse Interface — the UCI equivalent           │
 ├─────────────────────────────────────────────────────────────┤
 │  LAYER 2: BOT ADAPTER  (Elixir)                             │
 │  Internal: Erlang Port wrapping Rust binary                 │
@@ -95,7 +95,7 @@ schema "bots" do
   field :single_rating, :integer, default: 1200  # rating in single-position games
   field :dual_rating, :integer, default: 1200    # rating in dual-position games
 
-  field :config, :map, default: %{}            # engine config passed via BUP (depth, time, etc.)
+  field :config, :map, default: %{}            # engine config passed via UBI (depth, time, etc.)
 
   timestamps()
 end
@@ -130,15 +130,15 @@ From the game loop's perspective, the bot adapter simply calls `make_game_move` 
 
 ---
 
-## BUP — Bughouse Universal Protocol
+## UBI — Universal Bughouse Interface
 
-BUP is modeled after UCI but extended for the dimensions that make bughouse unique: two boards, four clocks, reserves, and teammate coordination signals.
+UBI is modeled after UCI but extended for the dimensions that make bughouse unique: two boards, four clocks, reserves, and teammate coordination signals.
 
-> **Authoritative spec:** The full BUP v0.1 specification lives in [`bughouse-engine/docs/BUP.md`](../bughouse-engine/docs/BUP.md). This section is a summary for integration context. When in doubt, `BUP.md` wins.
+> **Authoritative spec:** The full UBI v0.1 specification lives in [`bughouse-engine/docs/UBI.md`](../bughouse-engine/docs/UBI.md). This section is a summary for integration context. When in doubt, `UBI.md` wins.
 
 ### Why a Protocol?
 
-UCI's power is its simplicity. An engine is a black box: you give it a position, it gives you a move. The protocol is language-agnostic and transport-agnostic. BUP does the same for bughouse, which means:
+UCI's power is its simplicity. An engine is a black box: you give it a position, it gives you a move. The protocol is language-agnostic and transport-agnostic. UBI does the same for bughouse, which means:
 
 - Engines can be written in any language (Rust, C++, Python, Go — whatever)
 - Engines can be hosted anywhere (same server, remote VPS, cloud function)
@@ -154,8 +154,8 @@ Positions use **BFEN** (Bughouse FEN), which embeds reserves directly in the pos
 
 ```
 # ── Handshake ─────────────────────────────────────────────────
-bup                                         # Engine must reply: id name/author, then bupok
-bupnewgame                                  # Clear state for a new game
+ubi                                         # Engine must reply: id name/author, then ubiok
+ubinewgame                                  # Clear state for a new game
 isready                                     # Engine must reply: readyok
 
 # ── Position (uses BFEN — reserves embedded in brackets) ──────
@@ -193,7 +193,7 @@ quit
 # ── Identification (during handshake) ─────────────────────────
 id name <string>
 id author <string>
-bupok
+ubiok
 
 # ── Best Move ─────────────────────────────────────────────────
 #   Standard move:   e2e4
@@ -219,12 +219,12 @@ readyok
 
 ```
 # Handshake
-> bup
+> ubi
 < id name BughouseBot 1.0
 < id author Viren
-< bupok
+< ubiok
 
-> bupnewgame
+> ubinewgame
 > isready
 < readyok
 
@@ -291,16 +291,16 @@ Nothing in `BughouseGameServer` changes. The bot adapter is a separate process t
 The adapter is a GenServer that:
 
 1. **Subscribes** to the game's PubSub topic on mount (same topic as LiveView)
-2. **Translates** `{:game_state_update, state}` into a BUP `position` command
+2. **Translates** `{:game_state_update, state}` into a UBI `position` command
 3. **Determines** if it's this bot's turn (checks `active_clocks` against its position)
 4. **Sends** `go` with the correct clock values
 5. **Reads** `bestmove` back from the engine
 6. **Calls** `Games.make_game_move/3` or `Games.drop_game_piece/4`
 7. **Forwards** `request` messages to the teammate's adapter (if applicable)
 
-### State Translation: Game State → BUP Commands
+### State Translation: Game State → UBI Commands
 
-The game state broadcast already contains everything BUP needs. The adapter converts it to BFEN-based `position` and `clock` commands:
+The game state broadcast already contains everything UBI needs. The adapter converts it to BFEN-based `position` and `clock` commands:
 
 ```elixir
 # What the server broadcasts (from serialize_state_for_client/1):
@@ -317,7 +317,7 @@ The game state broadcast already contains everything BUP needs. The adapter conv
   }
 }
 
-# Adapter translates to BUP commands:
+# Adapter translates to UBI commands:
 #   1. Build BFEN for each board (embed reserves in brackets)
 #   2. Send position + clock commands
 #
@@ -343,7 +343,7 @@ Note: BFEN embeds reserves directly in the position string using bracket notatio
 | Hosting | Same Fly.io VM | Remote server (any HTTP endpoint) |
 | Latency | Sub-millisecond IPC | Network round-trip |
 | Health check | Port alive? | HTTP GET health_url |
-| BUP framing | One message per line | One message per WebSocket frame |
+| UBI framing | One message per line | One message per WebSocket frame |
 | Lifecycle | Spawned on game start, stopped on game end | Connects on game start, disconnects on game end |
 
 ---
@@ -423,13 +423,13 @@ An opponent with three pawns in reserve can drop-check you repeatedly. A queen i
 bughouse-engine/                             # Engine binary (Rust)
 ├── Cargo.toml                               # Depends on bughouse-chess
 ├── src/
-│   ├── main.rs                              # BUP protocol handler (stdin/stdout loop)
+│   ├── main.rs                              # UBI protocol handler (stdin/stdout loop)
 │   ├── search.rs                            # Minimax / alpha-beta search
 │   ├── scoring.rs                           # Position scoring / evaluation function
 │   └── time.rs                              # Time management (how long to think)
 ├── tests/
 │   ├── scoring_tests.rs                     # Scoring function sanity checks
-│   └── protocol_tests.rs                    # BUP parse/format tests
+│   └── protocol_tests.rs                    # UBI parse/format tests
 └── benches/
     └── search_bench.rs                      # Benchmark search speed at various depths
 
@@ -462,7 +462,7 @@ The engine depends on the library via:
 bughouse-chess = { git = "https://github.com/vcsawant/bughouse-chess", branch = "main" }
 ```
 
-The engine only needs to implement search, scoring, time management, and the BUP I/O loop — all board mechanics are delegated to the library.
+The engine only needs to implement search, scoring, time management, and the UBI I/O loop — all board mechanics are delegated to the library.
 
 ```rust
 use bughouse_chess::*;
@@ -544,9 +544,9 @@ Each phase has a clear deliverable and can be tested independently. Phases A and
 | A5 | Health check logic | Ping before placement; mark offline on failure |
 | A6 | Dual-position bot support | One bot fills two team seats; lobby shows linkage |
 
-### Phase B: BUP Protocol + Random Bot *(Rust)*
+### Phase B: UBI Protocol + Random Bot *(Rust)*
 
-**Deliverable:** A Rust binary that speaks BUP and plays random legal moves. End-to-end proof that the protocol works.
+**Deliverable:** A Rust binary that speaks UBI and plays random legal moves. End-to-end proof that the protocol works.
 
 | Step | Task | Notes |
 |---|---|---|
@@ -554,7 +554,7 @@ Each phase has a clear deliverable and can be tested independently. Phases A and
 | B2 | FEN parser | Parse piece-placement FEN into board struct |
 | B3 | Legal move generation | All piece types, including drops |
 | B4 | Random move selection | Pick a random legal move |
-| B5 | BUP stdin/stdout handler | Read `position` + `go`, write `bestmove` |
+| B5 | UBI stdin/stdout handler | Read `position` + `go`, write `bestmove` |
 | B6 | Basic test suite | Move gen correctness for known positions |
 
 ### Phase C: Bot Adapter + End-to-End Wiring *(Elixir)*
@@ -565,7 +565,7 @@ Each phase has a clear deliverable and can be tested independently. Phases A and
 |---|---|---|
 | C1 | Internal bot adapter (GenServer) | Wraps Rust binary via Erlang Port |
 | C2 | PubSub subscription + turn detection | Listen for state updates, detect own turn |
-| C3 | State → BUP translation | Convert game state map to `position` command |
+| C3 | State → UBI translation | Convert game state map to `position` command |
 | C4 | Move submission | Read `bestmove`, call `make_game_move` / `drop_game_piece` |
 | C5 | Integration test | Full game: human vs random bot (or bot vs bot) |
 | C6 | External bot adapter (Phoenix Channel) | For remote bots; same interface as internal |
@@ -594,7 +594,7 @@ Each phase has a clear deliverable and can be tested independently. Phases A and
 | E1 | Bot-only game mode | Lobby option: "Bot Game" — all 4 positions are bots |
 | E2 | Bot rankings | Separate leaderboard; Elo calculated between bots |
 | E3 | Difficulty tiers | Expose engine config (depth, time limit) as selectable difficulty |
-| E4 | External bot developer docs | BUP spec, registration flow, example client |
+| E4 | External bot developer docs | UBI spec, registration flow, example client |
 | E5 | Bot vs bot replay | All bot games are automatically replayable |
 
 ### Milestone Checkpoints
@@ -641,7 +641,7 @@ These are design decisions that should be revisited as each phase is implemented
 ### Engine Communication (Internal Bots)
 
 - [ ] **Erlang Port vs Rustler NIF for internal bot communication?**
-  - Port is simple: spawn a process, read/write stdin/stdout. Works with BUP as-is. Has IPC overhead (~1ms per message).
+  - Port is simple: spawn a process, read/write stdin/stdout. Works with UBI as-is. Has IPC overhead (~1ms per message).
   - NIF is faster (direct function call, no IPC) but tightly couples Rust to Elixir. Also means the engine can't run standalone.
   - *Leaning toward: Port first. If latency becomes an issue at deeper search depths, consider NIF.*
 
