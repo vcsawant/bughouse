@@ -14,8 +14,12 @@ export const ReplayPlayer = {
     // Parse data from server
     this.moveHistory = JSON.parse(this.el.dataset.moves || '[]');
 
-    // Use server-calculated duration (includes 3s buffer to show final position)
+    // Use server-calculated duration (includes buffer to show final position)
     this.totalDuration = parseInt(this.el.dataset.totalDuration || '0');
+
+    // Game end metadata (for timeout clock rundown)
+    this.gameEndReason = this.el.dataset.gameEndReason || null;
+    this.timeoutPosition = this.el.dataset.timeoutPosition || null;
 
     // Playback state
     this.isPlaying = false;
@@ -52,6 +56,11 @@ export const ReplayPlayer = {
 
     // Set up all event listeners
     this.setupEventListeners();
+
+    // Cache which clocks are active after the last move (for timeout rundown)
+    this.postGameActiveClocks = this.gameEndReason === 'timeout'
+      ? this.computeActiveClocksAfterLastMove()
+      : new Set();
 
     // Initialize clock display and active state at starting position
     this.initializeStartingPosition();
@@ -349,8 +358,12 @@ export const ReplayPlayer = {
           // This clock is frozen - use prevMove value
           interpolatedClocks[pos] = prevTime;
         }
+      } else if (this.gameEndReason === 'timeout' && this.postGameActiveClocks.has(pos)) {
+        // Timeout game: continue counting down active clocks after last move
+        const elapsed = timestamp - prevMove.timestamp;
+        interpolatedClocks[pos] = Math.max(0, prevTime - elapsed);
       } else {
-        // No next move - use prevMove value
+        // No next move (or inactive clock in timeout) - use prevMove value
         interpolatedClocks[pos] = prevTime;
       }
     });
@@ -369,7 +382,13 @@ export const ReplayPlayer = {
           activeClocks.add(pos);  // This clock is counting down significantly
         }
       });
-
+    } else if (this.gameEndReason === 'timeout') {
+      // After last move in timeout game: show active clocks until they hit 0
+      this.postGameActiveClocks.forEach(pos => {
+        if (interpolatedClocks[pos] > 0) {
+          activeClocks.add(pos);
+        }
+      });
     }
 
     // Update DOM if clock values OR active state changed
@@ -542,6 +561,41 @@ export const ReplayPlayer = {
       }
     }
     return null;
+  },
+
+  /**
+   * Compute which clocks are active after the last move.
+   * On each board, the opponent of the last mover has their clock running.
+   * If no moves were made on a board, white's clock is active (starting position).
+   */
+  computeActiveClocksAfterLastMove() {
+    const active = new Set();
+
+    const lastMoveBoard1 = [...this.moveHistory].reverse().find(m => m.board === 1);
+    const lastMoveBoard2 = [...this.moveHistory].reverse().find(m => m.board === 2);
+
+    active.add(lastMoveBoard1
+      ? this.getOpponentPosition(lastMoveBoard1.position)
+      : 'board_1_white');
+
+    active.add(lastMoveBoard2
+      ? this.getOpponentPosition(lastMoveBoard2.position)
+      : 'board_2_white');
+
+    return active;
+  },
+
+  /**
+   * Get the opponent position on the same board.
+   */
+  getOpponentPosition(position) {
+    const opponents = {
+      'board_1_white': 'board_1_black',
+      'board_1_black': 'board_1_white',
+      'board_2_white': 'board_2_black',
+      'board_2_black': 'board_2_white'
+    };
+    return opponents[position];
   },
 
   /**

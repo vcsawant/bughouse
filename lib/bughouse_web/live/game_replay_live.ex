@@ -28,7 +28,7 @@ defmodule BughouseWeb.GameReplayLive do
 
         # Calculate game metadata
         initial_time_ms = parse_time_control(game.time_control)
-        total_duration_ms = calculate_total_duration(moves)
+        total_duration_ms = calculate_total_duration(moves, game)
 
         # Build player names map
         players = %{
@@ -151,14 +151,44 @@ defmodule BughouseWeb.GameReplayLive do
 
   defp parse_time_control(_), do: 10 * 60 * 1000
 
-  # Calculate total replay duration from game start to last move + buffer
-  # Timestamps are relative to game start, so last move's timestamp is the duration
-  # Add 3 seconds buffer to show final position clearly (especially king captures)
-  defp calculate_total_duration(moves) when length(moves) > 0 do
-    List.last(moves).timestamp + 3000
+  defp get_timeout_position(game) do
+    with details when is_map(details) <- game.result_details,
+         reason when reason == "timeout" <-
+           to_string(details["reason"] || Map.get(details, :reason, "")),
+         pos when not is_nil(pos) <- details["position"] || Map.get(details, :position) do
+      to_string(pos)
+    else
+      _ -> nil
+    end
   end
 
-  defp calculate_total_duration(_), do: 3000
+  defp get_game_end_reason(game) do
+    with details when is_map(details) <- game.result_details,
+         reason when not is_nil(reason) <- details["reason"] || Map.get(details, :reason) do
+      to_string(reason)
+    else
+      _ -> nil
+    end
+  end
+
+  # Calculate total replay duration from game start to end + buffer.
+  # For timeout games, extends until the timed-out player's clock reaches 0.
+  # For other endings, adds a 3-second buffer after the last move.
+  defp calculate_total_duration(moves, game) when length(moves) > 0 do
+    last_move = List.last(moves)
+
+    case get_timeout_position(game) do
+      nil ->
+        last_move.timestamp + 3000
+
+      timeout_pos ->
+        time_key = String.to_existing_atom("#{timeout_pos}_time")
+        remaining = Map.get(last_move, time_key, 0)
+        last_move.timestamp + remaining + 1000
+    end
+  end
+
+  defp calculate_total_duration(_, _), do: 3000
 
   # Convert move map from string keys to atom keys
   # Database stores moves as JSON, which uses string keys
@@ -315,6 +345,8 @@ defmodule BughouseWeb.GameReplayLive do
         data-moves={Jason.encode!(@move_history)}
         data-total-duration={@total_duration_ms}
         data-state-version={@current_move_index}
+        data-game-end-reason={get_game_end_reason(@game)}
+        data-timeout-position={get_timeout_position(@game)}
         class="hidden"
       />
     </div>
