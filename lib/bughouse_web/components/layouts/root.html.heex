@@ -63,6 +63,31 @@
             setChessTheme(e.newValue || "classic");
           }
         });
+
+        // Clock style (clock colors - independent from board and app theme)
+        const setClockStyle = (style) => {
+          localStorage.setItem("phx:clock-style", style);
+          if (style === "default") {
+            document.documentElement.removeAttribute("data-clock-style");
+          } else {
+            document.documentElement.setAttribute("data-clock-style", style);
+          }
+        };
+
+        const savedClockStyle = localStorage.getItem("phx:clock-style") || "default";
+        if (savedClockStyle !== "default") {
+          setClockStyle(savedClockStyle);
+        }
+
+        window.addEventListener("phx:set-clock-style", (e) => {
+          setClockStyle(e.target.dataset.phxClockStyle);
+        });
+
+        window.addEventListener("storage", (e) => {
+          if (e.key === "phx:clock-style") {
+            setClockStyle(e.newValue || "default");
+          }
+        });
       })();
     </script>
   </head>

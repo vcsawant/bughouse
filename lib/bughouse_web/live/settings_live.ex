@@ -37,21 +37,29 @@ defmodule BughouseWeb.SettingsLive do
 
           <div class="divider my-0"></div>
 
-          <div class="flex justify-center">
+          <div class="flex items-center justify-between">
+            <span class="text-sm">Clock Style</span>
+            <.chess_clock_style_selector />
+          </div>
+
+          <div class="divider my-0"></div>
+          
+    <!-- Preview -->
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-widest opacity-50">
+              Preview
+            </span>
+
+            <.chess_clock time_ms={272_000} active={false} id="preview-clock-top" />
+
             <.chess_board
               fen="r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R"
               size="lg"
               flip={false}
             />
+
+            <.chess_clock time_ms={195_000} active={true} id="preview-clock-bottom" />
           </div>
-        </div>
-      </div>
-      
-    <!-- Clock Section (Future) -->
-      <div class="card bg-base-200 mb-4">
-        <div class="card-body p-4 gap-2">
-          <h2 class="card-title text-lg">Clock</h2>
-          <p class="text-sm text-base-content/50">Coming soon.</p>
         </div>
       </div>
     </div>

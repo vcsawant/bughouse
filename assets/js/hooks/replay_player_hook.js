@@ -517,22 +517,34 @@ export const ReplayPlayer = {
           secondsSpan.textContent = secondsStr;
         }
 
-        // Update active state styling (matches game_live appearance)
+        // Determine urgency and active state for clock styling
         const isActive = activeClocks.has(pos);
+        let urgency = 'normal';
+        if (timeMs <= 10000) urgency = 'critical';
+        else if (timeMs <= 30000) urgency = 'low';
+
+        const stateClass = `chess-clock-state-${urgency}-${isActive ? 'active' : 'inactive'}`;
+
+        // Replace previous state class (tracked via data attribute)
+        const oldState = clockContainer.dataset.clockState;
+        if (oldState && oldState !== stateClass) {
+          clockContainer.classList.remove(oldState);
+        }
+        clockContainer.dataset.clockState = stateClass;
+        clockContainer.classList.add(stateClass);
+
+        // Pulse animation for critical + active
+        if (urgency === 'critical' && isActive) {
+          clockContainer.classList.add('animate-pulse');
+        } else {
+          clockContainer.classList.remove('animate-pulse');
+        }
+
+        // Active data attribute (for other consumers)
         if (isActive) {
           clockContainer.setAttribute('data-active', 'true');
-          // Add active styling classes (full visual treatment)
-          clockContainer.classList.add('ring-4', 'ring-primary', 'ring-opacity-50');
-          clockContainer.classList.add('bg-primary', 'text-primary-content', 'border-primary');
-          // Remove inactive styling
-          clockContainer.classList.remove('bg-base-200', 'text-base-content', 'border-base-300', 'opacity-60');
         } else {
           clockContainer.removeAttribute('data-active');
-          // Remove active styling classes
-          clockContainer.classList.remove('ring-4', 'ring-primary', 'ring-opacity-50');
-          clockContainer.classList.remove('bg-primary', 'text-primary-content', 'border-primary');
-          // Add inactive styling
-          clockContainer.classList.add('bg-base-200', 'text-base-content', 'border-base-300', 'opacity-60');
         }
       }
     });

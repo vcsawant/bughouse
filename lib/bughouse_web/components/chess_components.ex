@@ -281,16 +281,13 @@ defmodule BughouseWeb.ChessComponents do
         "px-6 py-3 rounded-lg",
         "transition-all duration-300",
         "border-2",
-        @active && "ring-4 ring-primary ring-opacity-50",
+        clock_state_class(@urgency, @active),
         @active && @urgency == :critical && "animate-pulse",
-        @urgency == :critical && "bg-error text-error-content border-error",
-        @urgency == :low && "bg-warning text-warning-content border-warning",
-        @urgency == :normal && @active && "bg-primary text-primary-content border-primary",
-        @urgency == :normal && !@active && "bg-base-200 text-base-content border-base-300 opacity-60",
         @class
       ]}
       data-time-ms={@time_ms}
       data-active={@active}
+      data-clock-state={clock_state_class(@urgency, @active)}
       phx-hook="ChessClockCountdown"
       id={@id || "chess-clock-#{:erlang.phash2(@color || :default)}"}
     >
@@ -423,6 +420,93 @@ defmodule BughouseWeb.ChessComponents do
           <div class="bg-[oklch(45%_0.15_300)]"></div>
           <div class="bg-[oklch(45%_0.15_300)]"></div>
           <div class="bg-[oklch(92%_0.03_300)]"></div>
+        </div>
+      </button>
+    </div>
+    """
+  end
+
+  defp clock_state_class(urgency, active) do
+    state = if active, do: "active", else: "inactive"
+    "chess-clock-state-#{urgency}-#{state}"
+  end
+
+  @doc """
+  Renders a clock style selector.
+
+  Allows users to switch between different clock color schemes.
+  The selected style is saved to localStorage and persists across sessions.
+
+  ## Available Styles
+
+    * `default` - Modern blue/amber/red
+    * `minimal` - Clean, subtle borders
+    * `forest` - Green tones
+    * `ocean` - Blue tones
+    * `fire` - Warm amber/orange
+  """
+  def chess_clock_style_selector(assigns) do
+    ~H"""
+    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full w-fit">
+      <div class="absolute w-1/5 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-clock-style=minimal]_&]:left-[20%] [[data-clock-style=forest]_&]:left-[40%] [[data-clock-style=ocean]_&]:left-[60%] [[data-clock-style=fire]_&]:left-[80%] transition-[left]" />
+
+      <button
+        type="button"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
+        phx-click={JS.dispatch("phx:set-clock-style")}
+        data-phx-clock-style="default"
+        title="Default"
+      >
+        <div class="w-8 h-4 rounded bg-[oklch(50%_0.20_260)] opacity-75 hover:opacity-100 flex items-center justify-center">
+          <span class="text-[6px] font-mono text-white font-bold">5:00</span>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
+        phx-click={JS.dispatch("phx:set-clock-style")}
+        data-phx-clock-style="minimal"
+        title="Minimal"
+      >
+        <div class="w-8 h-4 rounded border border-[oklch(50%_0_0)] bg-[oklch(97%_0_0)] opacity-75 hover:opacity-100 flex items-center justify-center">
+          <span class="text-[6px] font-mono text-[oklch(20%_0_0)] font-bold">5:00</span>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
+        phx-click={JS.dispatch("phx:set-clock-style")}
+        data-phx-clock-style="forest"
+        title="Forest"
+      >
+        <div class="w-8 h-4 rounded bg-[oklch(42%_0.12_155)] opacity-75 hover:opacity-100 flex items-center justify-center">
+          <span class="text-[6px] font-mono text-white font-bold">5:00</span>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
+        phx-click={JS.dispatch("phx:set-clock-style")}
+        data-phx-clock-style="ocean"
+        title="Ocean"
+      >
+        <div class="w-8 h-4 rounded bg-[oklch(45%_0.15_240)] opacity-75 hover:opacity-100 flex items-center justify-center">
+          <span class="text-[6px] font-mono text-white font-bold">5:00</span>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        class="flex p-2 cursor-pointer w-1/5 justify-center"
+        phx-click={JS.dispatch("phx:set-clock-style")}
+        data-phx-clock-style="fire"
+        title="Fire"
+      >
+        <div class="w-8 h-4 rounded bg-[oklch(60%_0.18_60)] opacity-75 hover:opacity-100 flex items-center justify-center">
+          <span class="text-[6px] font-mono text-white font-bold">5:00</span>
         </div>
       </button>
     </div>

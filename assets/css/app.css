@@ -152,6 +152,189 @@
   --chess-selected: oklch(70% 0.25 60);
 }
 
+/* Clock Style System
+   CSS custom properties for clock color themes.
+   Independent from board theme and app theme.
+   Controlled via data-clock-style attribute on <html>.
+*/
+
+/* Default clock style */
+:root {
+  --clock-active-bg: oklch(50% 0.20 260);
+  --clock-active-text: oklch(98% 0 0);
+  --clock-active-border: oklch(42% 0.20 260);
+  --clock-active-ring: oklch(50% 0.20 260 / 0.35);
+  --clock-inactive-bg: oklch(92% 0.01 0);
+  --clock-inactive-text: oklch(35% 0 0);
+  --clock-inactive-border: oklch(82% 0 0);
+  --clock-low-bg: oklch(78% 0.15 85);
+  --clock-low-text: oklch(25% 0.05 85);
+  --clock-low-border: oklch(68% 0.15 85);
+  --clock-low-ring: oklch(78% 0.15 85 / 0.35);
+  --clock-critical-bg: oklch(55% 0.22 25);
+  --clock-critical-text: oklch(98% 0 0);
+  --clock-critical-border: oklch(45% 0.22 25);
+  --clock-critical-ring: oklch(55% 0.22 25 / 0.35);
+}
+
+[data-theme="dark"] {
+  --clock-inactive-bg: oklch(28% 0.01 0);
+  --clock-inactive-text: oklch(70% 0 0);
+  --clock-inactive-border: oklch(38% 0 0);
+}
+
+/* Minimal clock style */
+[data-clock-style="minimal"] {
+  --clock-active-bg: oklch(97% 0 0);
+  --clock-active-text: oklch(20% 0 0);
+  --clock-active-border: oklch(50% 0 0);
+  --clock-active-ring: oklch(40% 0 0 / 0.15);
+  --clock-inactive-bg: oklch(95% 0 0);
+  --clock-inactive-text: oklch(55% 0 0);
+  --clock-inactive-border: oklch(80% 0 0);
+  --clock-low-bg: oklch(96% 0.03 85);
+  --clock-low-text: oklch(35% 0.08 85);
+  --clock-low-border: oklch(65% 0.10 85);
+  --clock-low-ring: oklch(70% 0.10 85 / 0.2);
+  --clock-critical-bg: oklch(96% 0.03 25);
+  --clock-critical-text: oklch(40% 0.15 25);
+  --clock-critical-border: oklch(55% 0.15 25);
+  --clock-critical-ring: oklch(55% 0.15 25 / 0.2);
+}
+
+[data-theme="dark"][data-clock-style="minimal"] {
+  --clock-active-bg: oklch(22% 0 0);
+  --clock-active-text: oklch(85% 0 0);
+  --clock-active-border: oklch(50% 0 0);
+  --clock-inactive-bg: oklch(18% 0 0);
+  --clock-inactive-text: oklch(55% 0 0);
+  --clock-inactive-border: oklch(35% 0 0);
+  --clock-low-bg: oklch(22% 0.03 85);
+  --clock-low-text: oklch(78% 0.08 85);
+  --clock-low-border: oklch(45% 0.10 85);
+  --clock-critical-bg: oklch(22% 0.03 25);
+  --clock-critical-text: oklch(75% 0.12 25);
+  --clock-critical-border: oklch(45% 0.12 25);
+}
+
+/* Forest clock style */
+[data-clock-style="forest"] {
+  --clock-active-bg: oklch(42% 0.12 155);
+  --clock-active-text: oklch(98% 0 0);
+  --clock-active-border: oklch(35% 0.12 155);
+  --clock-active-ring: oklch(42% 0.12 155 / 0.35);
+  --clock-inactive-bg: oklch(92% 0.03 155);
+  --clock-inactive-text: oklch(30% 0.03 155);
+  --clock-inactive-border: oklch(80% 0.04 155);
+  --clock-low-bg: oklch(65% 0.12 95);
+  --clock-low-text: oklch(20% 0.05 95);
+  --clock-low-border: oklch(55% 0.12 95);
+  --clock-low-ring: oklch(65% 0.12 95 / 0.35);
+  --clock-critical-bg: oklch(50% 0.20 25);
+  --clock-critical-text: oklch(98% 0 0);
+  --clock-critical-border: oklch(42% 0.20 25);
+  --clock-critical-ring: oklch(50% 0.20 25 / 0.35);
+}
+
+[data-theme="dark"][data-clock-style="forest"] {
+  --clock-inactive-bg: oklch(22% 0.04 155);
+  --clock-inactive-text: oklch(70% 0.03 155);
+  --clock-inactive-border: oklch(32% 0.04 155);
+}
+
+/* Ocean clock style */
+[data-clock-style="ocean"] {
+  --clock-active-bg: oklch(45% 0.15 240);
+  --clock-active-text: oklch(98% 0 0);
+  --clock-active-border: oklch(38% 0.15 240);
+  --clock-active-ring: oklch(45% 0.15 240 / 0.35);
+  --clock-inactive-bg: oklch(93% 0.03 240);
+  --clock-inactive-text: oklch(35% 0.03 240);
+  --clock-inactive-border: oklch(82% 0.04 240);
+  --clock-low-bg: oklch(72% 0.12 70);
+  --clock-low-text: oklch(25% 0.05 70);
+  --clock-low-border: oklch(62% 0.12 70);
+  --clock-low-ring: oklch(72% 0.12 70 / 0.35);
+  --clock-critical-bg: oklch(55% 0.18 15);
+  --clock-critical-text: oklch(98% 0 0);
+  --clock-critical-border: oklch(45% 0.18 15);
+  --clock-critical-ring: oklch(55% 0.18 15 / 0.35);
+}
+
+[data-theme="dark"][data-clock-style="ocean"] {
+  --clock-inactive-bg: oklch(22% 0.04 240);
+  --clock-inactive-text: oklch(65% 0.03 240);
+  --clock-inactive-border: oklch(32% 0.04 240);
+}
+
+/* Fire clock style */
+[data-clock-style="fire"] {
+  --clock-active-bg: oklch(60% 0.18 60);
+  --clock-active-text: oklch(98% 0 0);
+  --clock-active-border: oklch(52% 0.18 60);
+  --clock-active-ring: oklch(60% 0.18 60 / 0.35);
+  --clock-inactive-bg: oklch(93% 0.03 60);
+  --clock-inactive-text: oklch(35% 0.03 60);
+  --clock-inactive-border: oklch(82% 0.04 60);
+  --clock-low-bg: oklch(55% 0.20 40);
+  --clock-low-text: oklch(98% 0 0);
+  --clock-low-border: oklch(47% 0.20 40);
+  --clock-low-ring: oklch(55% 0.20 40 / 0.35);
+  --clock-critical-bg: oklch(48% 0.25 25);
+  --clock-critical-text: oklch(98% 0 0);
+  --clock-critical-border: oklch(40% 0.25 25);
+  --clock-critical-ring: oklch(48% 0.25 25 / 0.35);
+}
+
+[data-theme="dark"][data-clock-style="fire"] {
+  --clock-inactive-bg: oklch(25% 0.04 60);
+  --clock-inactive-text: oklch(68% 0.03 60);
+  --clock-inactive-border: oklch(35% 0.04 60);
+}
+
+/* Clock state classes — applied by chess_clock component and replay JS */
+.chess-clock-state-normal-inactive {
+  background: var(--clock-inactive-bg);
+  color: var(--clock-inactive-text);
+  border-color: var(--clock-inactive-border);
+  opacity: 0.6;
+}
+
+.chess-clock-state-normal-active {
+  background: var(--clock-active-bg);
+  color: var(--clock-active-text);
+  border-color: var(--clock-active-border);
+  box-shadow: 0 0 0 4px var(--clock-active-ring);
+}
+
+.chess-clock-state-low-inactive {
+  background: var(--clock-low-bg);
+  color: var(--clock-low-text);
+  border-color: var(--clock-low-border);
+  opacity: 0.6;
+}
+
+.chess-clock-state-low-active {
+  background: var(--clock-low-bg);
+  color: var(--clock-low-text);
+  border-color: var(--clock-low-border);
+  box-shadow: 0 0 0 4px var(--clock-low-ring);
+}
+
+.chess-clock-state-critical-inactive {
+  background: var(--clock-critical-bg);
+  color: var(--clock-critical-text);
+  border-color: var(--clock-critical-border);
+  opacity: 0.6;
+}
+
+.chess-clock-state-critical-active {
+  background: var(--clock-critical-bg);
+  color: var(--clock-critical-text);
+  border-color: var(--clock-critical-border);
+  box-shadow: 0 0 0 4px var(--clock-critical-ring);
+}
+
 /* Chess Piece Styling
    Unicode chess pieces need special styling to render consistently.
    We use a dedicated font (Noto Sans Symbols 2) to ensure all pieces
