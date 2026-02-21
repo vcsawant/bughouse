@@ -272,7 +272,7 @@ This creates a unique dynamic where players must balance their own game while co
 - board_2_black_id (uuid, references players)
 - time_control (string) - e.g., "10min", "3+2"
 - moves (jsonb array) - Complete move history
-- result (string) - "king_captured", "timeout", "draw"
+- result (string) - "checkmate", "timeout", "draw"
 - result_details (jsonb) - Structured result information
 - result_timestamp (utc_datetime_usec)
 - final_board_1_fen (text) - Final position for analytics
@@ -731,6 +731,26 @@ config :bughouse, :bot_engine,
 ```
 
 The engine binary path is resolved at boot time. In dev, it points to the debug build in the sibling workspace. In production, set the `BUGHOUSE_ENGINE_PATH` env var.
+
+**Engine logging:**
+
+Each engine process writes a per-game debug log file with timestamped UBI I/O and search diagnostics (eval breakdowns, node counts, chosen moves). The Elixir server passes `--game-id` and `--log-file` when spawning the engine.
+
+| Environment | Log directory | Config |
+|-------------|---------------|--------|
+| Dev | `priv/logs/engine/` | `config/dev.exs` |
+| Prod | `/var/log/bughouse/engine/` | `BUGHOUSE_ENGINE_LOG_PATH` env var |
+
+Log files are named `YYYYMMDD-HHMMSS_<game_uuid>.log` and contain RFC 3339 timestamps at `Debug` level. Typical game logs are 15-60 KB.
+
+**Accessing engine logs in production:**
+```bash
+# SSH into the Fly machine and read a specific game log
+flyctl ssh console -C "ls /var/log/bughouse/engine/"
+flyctl ssh console -C "cat /var/log/bughouse/engine/<logfile>"
+```
+
+Note: Fly.io uses an **ephemeral filesystem** — engine logs are lost on deploy or machine restart. These logs are separate from Phoenix stdout (which `flyctl logs` captures). For durable engine logs, consider attaching a Fly Volume or forwarding to a log aggregation service.
 
 **How it works:**
 1. Players add a bot to a team in the lobby

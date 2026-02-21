@@ -254,18 +254,6 @@ defmodule Bughouse.Games.BughouseGameServer do
 
             {:reply, :ok, new_state}
 
-          {:ok, {:king_captured, winner}} ->
-            winning_team = binbo_winner_to_team(winner, board_num)
-
-            new_state =
-              state
-              |> record_move(board_num, position, :move, move_notation)
-              |> end_game(winning_team, :king_captured, %{board: board_num, winner: winner})
-              |> persist_to_database()
-              |> broadcast_game_over()
-
-            {:reply, :ok, new_state}
-
           {:ok, {:checkmate, winner}} ->
             winning_team = binbo_winner_to_team(winner, board_num)
 
