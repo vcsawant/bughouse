@@ -1,7 +1,7 @@
 # =============================================================================
 # Stage 1: Build the Rust bughouse engine
 # =============================================================================
-FROM rust:1.85-slim-bookworm AS rust-builder
+FROM rust:1.93-slim-bookworm AS rust-builder
 
 RUN apt-get update -y && apt-get install -y git pkg-config && \
     rm -rf /var/lib/apt/lists/*
