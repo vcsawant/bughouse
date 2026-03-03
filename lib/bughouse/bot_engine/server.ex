@@ -262,32 +262,14 @@ defmodule Bughouse.BotEngine.Server do
   defp request_move(state, position) do
     case Games.get_bfen(state.game_id) do
       {:ok, board_1_bfen, board_2_bfen, clocks} ->
-        # Send both board positions
-        send_to_engine(state.port, "position board A bfen #{board_1_bfen}")
-        send_to_engine(state.port, "position board B bfen #{board_2_bfen}")
-
-        # Send clock values
+        # UBI v1.0: single atomic position command with both boards + all clocks
         send_to_engine(
           state.port,
-          "clock white_A #{round(clocks.board_1_white)}"
+          "position #{board_1_bfen} | #{board_2_bfen} clock " <>
+            "#{round(clocks.board_1_white)} #{round(clocks.board_1_black)} " <>
+            "#{round(clocks.board_2_white)} #{round(clocks.board_2_black)}"
         )
 
-        send_to_engine(
-          state.port,
-          "clock black_A #{round(clocks.board_1_black)}"
-        )
-
-        send_to_engine(
-          state.port,
-          "clock white_B #{round(clocks.board_2_white)}"
-        )
-
-        send_to_engine(
-          state.port,
-          "clock black_B #{round(clocks.board_2_black)}"
-        )
-
-        # Determine UBI board id from position
         board_id = position_to_ubi_board(position)
         send_to_engine(state.port, "go board #{board_id}")
 
@@ -302,8 +284,13 @@ defmodule Bughouse.BotEngine.Server do
   ## Best Move Handling
 
   defp handle_bestmove(rest, state) do
-    # Parse "A e2e4" or "B p@e4"
+    # Parse "A e2e4" or "B p@e4" or "A (none)"
     case String.split(rest, " ", parts: 2) do
+      [_board_str, "(none)"] ->
+        # No legal moves — game should already be ending via checkmate detection
+        Logger.info("BotEngineServer: engine reports no legal moves (game #{state.invite_code})")
+        %{state | pending_go: nil}
+
       [_board_str, move_str] ->
         execute_move(state, move_str, state.pending_go)
 

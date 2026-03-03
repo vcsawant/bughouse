@@ -147,16 +147,18 @@ This creates a unique dynamic where players must balance their own game while co
   - [x] Hard fail: game refuses to start if bot engine limit would be exceeded
   - [ ] Health check system — external bots must be alive to join a game
 
-- [x] **UBI — Universal Bughouse Interface**
-  - [x] Standardized stdin/stdout protocol for bughouse engines (modeled after UCI)
-  - [x] Supports two-board state, four clocks, reserves via BFEN
+- [x] **UBI v1.0 — Universal Bughouse Interface**
+  - [x] Standardized stdin/stdout protocol for bughouse engines (modeled after UCI) — see [UBI.md](./UBI.md)
+  - [x] Atomic `position` command: both boards + four clocks in a single line
+  - [x] Full-state updates (no incremental move lists)
+  - [x] Per-board search state model (IDLE/SEARCHING)
   - [x] Internal bots connect via Erlang Port (BotEngineServer GenServer)
+  - [x] Teammate coordination via `teammsg` / `partnermsg`
   - [ ] External bots connect via Phoenix Channel (future)
-  - [ ] Teammate piece request signaling via `teammsg` / `partnermsg`
 
 - [x] **Rust-Based Bughouse Engine (Phase B — Random Move Bot)**
   - [x] Move generation library ([bughouse-chess](../bughouse-chess/)) — bitboard-based, BFEN parsing, reserves, drops, promoted-piece tracking
-  - [x] Engine binary ([bughouse-engine](../bughouse-engine/)) — UBI protocol, random move selection, 46 unit tests
+  - [x] Engine binary ([bughouse-engine](../bughouse-engine/)) — UBI v1.0 protocol, random move selection, 83 unit tests
   - [ ] Iterative deepening with alpha-beta pruning (Phase D)
   - [ ] Bughouse-specific scoring: reserves, drop threats, clock pressure (Phase C-E)
   - [ ] Parallel root search with Rayon
@@ -230,7 +232,7 @@ This creates a unique dynamic where players must balance their own game while co
 **Write-Once at Game Completion:**
 - Game state managed in-memory during active gameplay (LiveView/GenServer)
 - Chess logic handled by binbo-bughouse fork
-  - Produces spec-compliant **BFEN** (see [BFEN.md](./BFEN.md)):
+  - Produces spec-compliant **BFEN 2.0** (see [BFEN.md](./BFEN.md)):
     - Reserves in single-bracket format `[QRBNPqrbnp]`; empty reserves emit `[]`
     - Promoted pieces marked with `~` suffix in position string (e.g. `Q~`)
     - Parser accepts both single-bracket and legacy two-bracket reserve formats
@@ -1159,7 +1161,7 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ### Q4 2026 / 2027
 - [ ] Bot registry + lobby integration (Phase 4A)
-- [ ] UBI protocol + Rust engine first cut (Phase 4B-C)
+- [x] UBI v1.0 protocol + Rust engine first cut (Phase 4B-C)
 - [ ] Engine heuristics iteration (Phase 4D)
 - [ ] Bot-only games + rankings (Phase 4E)
 - [ ] Advanced features (voice chat, etc.)
