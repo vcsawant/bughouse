@@ -7,6 +7,8 @@ RUN apt-get update -y && apt-get install -y git pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
+# ARG busts Docker cache so we always get the latest engine commit
+ARG ENGINE_CACHE_BUST=1
 RUN git clone --depth 1 https://github.com/vcsawant/bughouse-engine.git
 
 WORKDIR /build/bughouse-engine
