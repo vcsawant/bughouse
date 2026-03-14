@@ -100,8 +100,11 @@ defmodule Bughouse.BotEngine.Server do
   end
 
   # Game state update from PubSub
-  def handle_info({:game_state_update, game_state}, state) do
-    state = maybe_request_move(state, game_state)
+  # NOTE: We ignore the broadcast game_state and fetch fresh state instead,
+  # because stale broadcasts queued in our mailbox can have outdated active_clocks,
+  # causing the engine to search the wrong board/color.
+  def handle_info({:game_state_update, _game_state}, state) do
+    state = check_and_request_move(state)
     {:noreply, state}
   end
 
@@ -317,9 +320,19 @@ defmodule Bughouse.BotEngine.Server do
         :ok
 
       {:error, reason} ->
-        Logger.warning(
-          "BotEngineServer: move #{move_str} rejected: #{inspect(reason)} " <>
-            "(game #{state.invite_code})"
+        board_id = position_to_ubi_board(position)
+
+        bfen_info =
+          case Games.get_bfen(state.game_id) do
+            {:ok, b1, b2, _clocks} -> "\n  board_A_bfen=#{b1}\n  board_B_bfen=#{b2}"
+            _ -> ""
+          end
+
+        Logger.error(
+          "BOT ILLEGAL MOVE [#{state.invite_code}] " <>
+            "board=#{board_id} pos=#{position} bot=#{state.bot_player_id}\n" <>
+            "  move=#{move_str} error=#{inspect(reason)}" <>
+            bfen_info
         )
     end
 

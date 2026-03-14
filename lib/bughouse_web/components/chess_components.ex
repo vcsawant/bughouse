@@ -908,9 +908,7 @@ defmodule BughouseWeb.ChessComponents do
         "font-semibold text-lg flex items-center justify-center gap-2",
         @is_me && "text-primary"
       ]}>
-        <%= if @is_active do %>
-          <span class="text-success text-2xl" title="Active turn">▶</span>
-        <% end %>
+        <span class={["text-2xl", if(@is_active, do: "text-success", else: "invisible")]} title="Active turn">▶</span>
         <span>
           {@player_name} {if @is_me, do: "(You)"}
         </span>
