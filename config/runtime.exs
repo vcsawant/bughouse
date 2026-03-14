@@ -64,6 +64,20 @@ if config_env() == :prod do
 
   config :bughouse, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # OAuth configuration — must be in runtime.exs so Fly secrets are available
+  config :bughouse, :oauth,
+    google: [
+      client_id:
+        System.get_env("GOOGLE_CLIENT_ID") ||
+          raise("environment variable GOOGLE_CLIENT_ID is missing"),
+      client_secret:
+        System.get_env("GOOGLE_CLIENT_SECRET") ||
+          raise("environment variable GOOGLE_CLIENT_SECRET is missing"),
+      redirect_uri:
+        System.get_env("GOOGLE_REDIRECT_URI") ||
+          raise("environment variable GOOGLE_REDIRECT_URI is missing")
+    ]
+
   config :bughouse, BughouseWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [

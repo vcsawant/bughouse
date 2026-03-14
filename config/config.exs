@@ -16,13 +16,13 @@ config :bughouse, :bot_engine,
   max_concurrent: 2,
   game_log_path: nil
 
-# OAuth configuration
+# OAuth configuration (secrets loaded at runtime in config/runtime.exs)
+# Defaults here allow `mix compile` to succeed without env vars set.
 config :bughouse, :oauth,
   google: [
-    client_id: System.get_env("GOOGLE_CLIENT_ID"),
-    client_secret: System.get_env("GOOGLE_CLIENT_SECRET"),
-    redirect_uri:
-      System.get_env("GOOGLE_REDIRECT_URI") || "http://localhost:4000/auth/google/callback"
+    client_id: "not-set",
+    client_secret: "not-set",
+    redirect_uri: "http://localhost:4000/auth/google/callback"
   ]
 
 # Configure the endpoint
