@@ -53,6 +53,9 @@ defmodule BughouseWeb.Router do
       ],
       layout: {BughouseWeb.Layouts, :app} do
       live "/account", AccountLive
+      live "/bots", BotLive, :index
+      live "/bots/new", BotLive, :new
+      live "/bots/:id/edit", BotLive, :edit
     end
   end
 
@@ -61,6 +64,8 @@ defmodule BughouseWeb.Router do
     pipe_through :api
 
     get "/username/check/:username", UsernameController, :check_availability
+    get "/bots", BotController, :index
+    get "/bots/:id", BotController, :show
   end
 
   # Enable LiveDashboard in development

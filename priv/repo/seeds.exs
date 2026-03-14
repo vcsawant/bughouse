@@ -16,7 +16,6 @@ alias Bughouse.Schemas.Accounts.{Player, Bot}
 # ── Internal Bot: Rusty ──────────────────────────────────────
 #
 # The Rust-based bughouse engine that runs as an Erlang Port.
-# Supports dual mode (plays both seats of a team).
 
 bot_username = "rusty"
 
@@ -47,19 +46,22 @@ case Repo.get_by(Bot, player_id: player.id) do
     %Bot{}
     |> Bot.changeset(%{
       player_id: player.id,
+      name: bot_username,
+      display_name: "Rusty",
+      description: "Built-in Rust bughouse engine",
       bot_type: "internal",
       status: "online",
-      supported_modes: "both",
-      single_rating: 1200,
-      dual_rating: 1200,
-      config: %{}
+      is_public: true,
+      is_active: true,
+      config: %{},
+      default_options: Bughouse.Bots.strength_presets()["balanced"]
     })
     |> Repo.insert!()
 
   existing ->
     # Ensure bot is online (in case it was set offline previously)
     existing
-    |> Bot.changeset(%{status: "online"})
+    |> Bot.status_changeset(%{status: "online"})
     |> Repo.update!()
 end
 

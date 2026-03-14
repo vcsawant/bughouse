@@ -12,6 +12,11 @@
         <a href={~p"/game/new"} class="btn btn-ghost btn-sm">
           New Game
         </a>
+        <%= if assigns[:current_player] && !@current_player.guest do %>
+          <.link navigate={~p"/bots"} class="btn btn-ghost btn-sm">
+            Bots
+          </.link>
+        <% end %>
         <.user_menu current_player={@current_player} />
         <.link navigate={~p"/settings"} class="btn btn-ghost btn-sm" title="Settings">
           <.icon name="hero-cog-6-tooth" class="size-6" />

@@ -170,6 +170,43 @@ This creates a unique dynamic where players must balance their own game while co
   - Configurable difficulty tiers
   - External bot developer documentation
 
+- [x] **Bot Management System**
+  - [x] Bot registration UI at `/bots` (authenticated users)
+  - [x] CRUD operations: create, edit, delete bots
+  - [x] Multiple bots per user with unique bot names
+  - [x] Strength presets (Fast, Balanced, Strong, Custom) with UBI `setoption` defaults
+  - [x] Internal/external bot types — external bots specify a WebSocket endpoint
+  - [x] Per-bot stats: games played, win rate, rating
+  - [x] Health check stub for engine connectivity
+  - [x] Public API: `GET /api/bots` (list public bots), `GET /api/bots/:id` (bot detail by UUID or name)
+
+### Bot System
+
+#### Registering a Bot
+
+Authenticated users can register bots at `/bots`:
+
+1. **Name** — unique identifier (`[a-zA-Z0-9_]{3,20}`)
+2. **Display Name** — shown in lobby and game UI
+3. **Type** — `internal` (server-side Erlang Port) or `external` (remote WebSocket)
+4. **Strength Preset** — Fast / Balanced / Strong / Custom engine options
+5. **Visibility** — public bots appear in the lobby for all players
+
+#### External Bot Endpoint Requirements
+
+External bots must provide a WebSocket base URL (e.g., `wss://my-bot.example.com`). The platform connects to:
+- `{endpoint_base}/game/health_check` — health verification
+- `{endpoint_base}/game/{game_id}` — game session
+
+The connection uses the [UBI protocol](./UBI.md) over WebSocket.
+
+#### API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/bots` | List all public, active bots (name, rating, status, games) |
+| GET | `/api/bots/:id` | Bot detail by UUID or name, includes owner info |
+
 ---
 
 ## 🏗️ Technical Architecture

@@ -21,7 +21,7 @@ defmodule Bughouse.Schemas.Accounts.Player do
     field :email, :string
     field :email_confirmed_at, :utc_datetime
 
-    has_one :bot, Bughouse.Schemas.Accounts.Bot
+    has_many :bots, Bughouse.Schemas.Accounts.Bot
     has_many :game_players, Bughouse.Schemas.Games.GamePlayer
     has_many :games, through: [:game_players, :game]
     has_many :friendships, Bughouse.Schemas.Accounts.Friendship

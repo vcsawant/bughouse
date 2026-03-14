@@ -32,7 +32,7 @@ defmodule BughouseWeb.LobbyLive do
 
         Logger.info("LobbyLive: Loaded game #{game.id}, my_position=#{inspect(my_position)}")
 
-        available_bots = Accounts.list_available_bots()
+        available_bots = Bughouse.Bots.list_public_bots()
 
         friends =
           if current_player.guest do
@@ -254,7 +254,7 @@ defmodule BughouseWeb.LobbyLive do
 
   # Produces [{bot, mode}, ...] for the dropdown of a given open seat.
   # Excludes bots already in a game position; offers "dual" when the teammate
-  # seat is also open and the bot's supported_modes allows it.
+  # seat is also open.
   defp filter_bots_for_position(game, position, available_bots) do
     in_game_ids =
       [:board_1_white_id, :board_1_black_id, :board_2_white_id, :board_2_black_id]
@@ -267,13 +267,10 @@ defmodule BughouseWeb.LobbyLive do
     available_bots
     |> Enum.reject(fn b -> MapSet.member?(in_game_ids, b.player.id) end)
     |> Enum.flat_map(fn bot ->
-      single =
-        if bot.supported_modes in ["single", "both"],
-          do: [{bot, "single"}],
-          else: []
+      single = [{bot, "single"}]
 
       dual =
-        if teammate_open && bot.supported_modes in ["dual", "both"],
+        if teammate_open,
           do: [{bot, "dual"}],
           else: []
 

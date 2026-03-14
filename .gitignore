@@ -44,3 +44,6 @@ npm-debug.log
 # Bot engine game logs
 /priv/logs/
 
+# Claude Code local settings (personal per-developer preferences)
+.claude/settings.local.json
+

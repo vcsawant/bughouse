@@ -256,6 +256,8 @@ defmodule Bughouse.Accounts do
 
   @doc """
   Returns all bots currently marked online, with their player records preloaded.
+
+  Deprecated: Use `Bughouse.Bots.list_public_bots/0` instead.
   """
   def list_available_bots do
     from(b in Bot,

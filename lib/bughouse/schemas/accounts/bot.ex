@@ -8,20 +8,38 @@ defmodule Bughouse.Schemas.Accounts.Bot do
   schema "bots" do
     belongs_to :player, Bughouse.Schemas.Accounts.Player
 
+    # Bot identity
+    field :name, :string
+    field :display_name, :string
+    field :description, :string, default: ""
+
     # "internal" | "external"
     field :bot_type, :string
-    # HTTP health endpoint (external bots only)
-    field :health_url, :string
+
+    # Connection (external bots)
+    field :endpoint_base, :string
+
     # "online" | "offline" | "in_game"
     field :status, :string, default: "offline"
-    # "single" | "dual" | "both"
-    field :supported_modes, :string
 
-    field :single_rating, :integer, default: 1200
-    field :dual_rating, :integer, default: 1200
-
-    # engine config passed to UBI
+    # Engine settings
     field :config, :map, default: %{}
+    field :default_options, :map, default: %{}
+    field :max_concurrent_games, :integer, default: 1
+    field :timeout_seconds, :integer, default: 10
+
+    # Visibility
+    field :is_public, :boolean, default: false
+    field :is_active, :boolean, default: true
+
+    # Stats
+    field :games_played, :integer, default: 0
+    field :games_won, :integer, default: 0
+    field :current_rating, :integer, default: 1200
+
+    # Health monitoring
+    field :health_status, :string, default: "unknown"
+    field :last_health_check, :utc_datetime
 
     timestamps(type: :utc_datetime)
   end
@@ -31,31 +49,70 @@ defmodule Bughouse.Schemas.Accounts.Bot do
     bot
     |> cast(attrs, [
       :player_id,
+      :name,
+      :display_name,
+      :description,
       :bot_type,
-      :health_url,
+      :endpoint_base,
       :status,
-      :supported_modes,
-      :single_rating,
-      :dual_rating,
-      :config
+      :config,
+      :default_options,
+      :max_concurrent_games,
+      :timeout_seconds,
+      :is_public,
+      :is_active
     ])
-    |> validate_required([:player_id, :bot_type, :supported_modes])
+    |> validate_required([:player_id, :name, :display_name, :bot_type])
+    |> validate_name()
     |> validate_inclusion(:bot_type, ["internal", "external"])
     |> validate_inclusion(:status, ["online", "offline", "in_game"])
-    |> validate_inclusion(:supported_modes, ["single", "dual", "both"])
-    |> unique_constraint(:player_id)
+    |> validate_number(:max_concurrent_games,
+      greater_than_or_equal_to: 1,
+      less_than_or_equal_to: 5
+    )
+    |> validate_number(:timeout_seconds,
+      greater_than_or_equal_to: 1,
+      less_than_or_equal_to: 60
+    )
+    |> unique_constraint(:name)
     |> foreign_key_constraint(:player_id)
-    |> validate_health_url()
+    |> validate_endpoint_base()
   end
 
-  # External bots must declare a health endpoint so the lobby can verify
-  # they're reachable before placing them in a game.
-  defp validate_health_url(changeset) do
-    bot_type = get_field(changeset, :bot_type)
-    health_url = get_field(changeset, :health_url)
+  @doc """
+  Changeset for updating game stats (games_played, games_won).
+  """
+  def stats_changeset(bot, attrs) do
+    bot
+    |> cast(attrs, [:games_played, :games_won, :current_rating])
+    |> validate_number(:games_played, greater_than_or_equal_to: 0)
+    |> validate_number(:games_won, greater_than_or_equal_to: 0)
+    |> validate_number(:current_rating, greater_than_or_equal_to: 0)
+  end
 
-    if bot_type == "external" && is_nil(health_url) do
-      add_error(changeset, :health_url, "is required for external bots")
+  @doc """
+  Changeset for updating health/operational status.
+  """
+  def status_changeset(bot, attrs) do
+    bot
+    |> cast(attrs, [:status, :health_status, :last_health_check])
+    |> validate_inclusion(:status, ["online", "offline", "in_game"])
+  end
+
+  defp validate_name(changeset) do
+    changeset
+    |> validate_format(:name, ~r/^[a-zA-Z0-9_]{3,20}$/,
+      message: "must be 3-20 characters and contain only letters, numbers, and underscores"
+    )
+  end
+
+  # External bots must declare an endpoint_base so the system can connect to them.
+  defp validate_endpoint_base(changeset) do
+    bot_type = get_field(changeset, :bot_type)
+    endpoint_base = get_field(changeset, :endpoint_base)
+
+    if bot_type == "external" && (is_nil(endpoint_base) || endpoint_base == "") do
+      add_error(changeset, :endpoint_base, "is required for external bots")
     else
       changeset
     end
