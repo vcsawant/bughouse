@@ -53,7 +53,7 @@ defmodule Bughouse.BotEngine.Server do
 
     # Open Port to the engine binary
     engine_path = get_engine_path()
-    engine_args = build_engine_args(game_id)
+    engine_args = build_engine_args(game_id, bot_player_id)
 
     port =
       Port.open({:spawn_executable, engine_path}, [
@@ -350,7 +350,7 @@ defmodule Bughouse.BotEngine.Server do
       raise "Bot engine path not configured. Set :bughouse, :bot_engine, :engine_path"
   end
 
-  defp build_engine_args(game_id) do
+  defp build_engine_args(game_id, bot_player_id) do
     base_args = ["--game-id", game_id]
 
     case Application.get_env(:bughouse, :bot_engine)[:game_log_path] do
@@ -360,7 +360,8 @@ defmodule Bughouse.BotEngine.Server do
       log_dir ->
         File.mkdir_p!(log_dir)
         timestamp = Calendar.strftime(DateTime.utc_now(), "%Y%m%d-%H%M%S")
-        log_file = Path.join(log_dir, "#{timestamp}_#{game_id}.log")
+        short_id = String.slice(bot_player_id, 0, 8)
+        log_file = Path.join(log_dir, "#{timestamp}_#{game_id}_#{short_id}.log")
         base_args ++ ["--log-file", log_file]
     end
   end

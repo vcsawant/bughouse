@@ -46,6 +46,7 @@ case Repo.get_by(Bot, player_id: player.id) do
     %Bot{}
     |> Bot.changeset(%{
       player_id: player.id,
+      owner_id: player.id,
       name: bot_username,
       display_name: "Rusty",
       description: "Built-in Rust bughouse engine",

@@ -25,7 +25,7 @@ defmodule BughouseWeb.BotLive do
 
   defp apply_action(socket, :new, _params) do
     bot = %Bot{
-      player_id: socket.assigns.current_player.id,
+      owner_id: socket.assigns.current_player.id,
       bot_type: "internal",
       default_options: %{}
     }
@@ -41,7 +41,7 @@ defmodule BughouseWeb.BotLive do
   defp apply_action(socket, :edit, %{"id" => id}) do
     bot = Bots.get_bot!(id)
 
-    if bot.player_id != socket.assigns.current_player.id do
+    if bot.owner_id != socket.assigns.current_player.id do
       socket
       |> put_flash(:error, "You can only edit your own bots")
       |> push_navigate(to: ~p"/bots")
@@ -77,7 +77,7 @@ defmodule BughouseWeb.BotLive do
   def handle_event("delete", %{"id" => id}, socket) do
     bot = Bots.get_bot!(id)
 
-    if bot.player_id == socket.assigns.current_player.id do
+    if bot.owner_id == socket.assigns.current_player.id do
       {:ok, _} = Bots.delete_bot(bot)
 
       {:noreply,
@@ -98,21 +98,25 @@ defmodule BughouseWeb.BotLive do
 
   def handle_event("check_health", %{"id" => id}, socket) do
     bot = Bots.get_bot!(id)
-    {:ok, status} = HealthCheck.check(bot)
-    {:ok, bot} = Bots.update_health_status(bot, status)
+    {:ok, health} = HealthCheck.check(bot)
+    {:ok, bot} = Bots.update_health_status(bot, health)
+
+    # Auto-set operational status based on health result
+    op_status = if health == "healthy", do: "online", else: "offline"
+    {:ok, _bot} = Bots.update_status(bot, op_status)
 
     bots = Bots.list_bots_for_owner(socket.assigns.current_player.id)
 
     {:noreply,
      socket
      |> assign(:bots, bots)
-     |> put_flash(:info, "Health check: #{bot.display_name} is #{status}")}
+     |> put_flash(:info, "Health check: #{bot.display_name} is #{health}")}
   end
 
   # Save helpers
 
   defp save_bot(socket, :new, bot_params) do
-    bot_params = Map.put(bot_params, "player_id", socket.assigns.current_player.id)
+    bot_params = Map.put(bot_params, "owner_id", socket.assigns.current_player.id)
 
     case Bots.create_bot(bot_params) do
       {:ok, bot} ->
@@ -379,12 +383,12 @@ defmodule BughouseWeb.BotLive do
               <.input
                 field={@form[:endpoint_base]}
                 type="text"
-                placeholder="wss://my-bot.example.com"
+                placeholder="https://my-bot.example.com"
                 class="input input-bordered"
               />
               <label class="label">
                 <span class="label-text-alt">
-                  WebSocket endpoint for UBI protocol communication
+                  HTTP(S) base URL — health checks use HTTP, game sessions upgrade to WebSocket (wss://)
                 </span>
               </label>
             </div>

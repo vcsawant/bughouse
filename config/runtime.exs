@@ -23,6 +23,22 @@ end
 config :bughouse, BughouseWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# OAuth configuration for dev — read from environment variables if set
+if config_env() == :dev do
+  google_client_id = System.get_env("GOOGLE_CLIENT_ID")
+  google_client_secret = System.get_env("GOOGLE_CLIENT_SECRET")
+  google_redirect_uri = System.get_env("GOOGLE_REDIRECT_URI")
+
+  if google_client_id && google_client_secret do
+    config :bughouse, :oauth,
+      google: [
+        client_id: google_client_id,
+        client_secret: google_client_secret,
+        redirect_uri: google_redirect_uri || "http://localhost:4000/auth/google/callback"
+      ]
+  end
+end
+
 # Bot engine path + log directory (runtime so env vars resolve on the deploy target, not build machine)
 if config_env() == :prod do
   config :bughouse, :bot_engine,

@@ -1,19 +1,55 @@
 defmodule Bughouse.Bots do
   @moduledoc """
   The Bots context — bot registration, management, and stats.
+
+  Each bot has two Player references:
+  - `owner_id` — the human who registered and manages the bot
+  - `player_id` — the bot's game identity (a Player with `is_bot: true`)
+
+  When a bot is created, a dedicated Player record is auto-created for it.
   """
 
   import Ecto.Query, warn: false
   alias Bughouse.Repo
-  alias Bughouse.Schemas.Accounts.Bot
+  alias Bughouse.Schemas.Accounts.{Bot, Player}
+  alias Ecto.Multi
 
   @doc """
-  Creates a new bot.
+  Creates a new bot with an auto-generated Player record for its game identity.
+
+  The `owner_id` in attrs identifies the human who manages this bot.
+  A separate Player (with `is_bot: true`) is created for the bot to use in games.
   """
   def create_bot(attrs) do
-    %Bot{}
-    |> Bot.changeset(attrs)
-    |> Repo.insert()
+    Multi.new()
+    |> Multi.insert(:bot_player, fn _changes ->
+      Player.changeset(%Player{}, %{
+        username: attrs["name"] || attrs[:name],
+        display_name: attrs["display_name"] || attrs[:display_name],
+        is_bot: true,
+        guest: false,
+        current_rating: 1200,
+        peak_rating: 1200,
+        total_games: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0
+      })
+    end)
+    |> Multi.insert(:bot, fn %{bot_player: bot_player} ->
+      attrs =
+        attrs
+        |> Map.put("player_id", bot_player.id)
+        |> Map.put("owner_id", attrs["owner_id"] || attrs[:owner_id])
+
+      Bot.changeset(%Bot{}, attrs)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{bot: bot}} -> {:ok, bot}
+      {:error, :bot_player, changeset, _} -> {:error, changeset}
+      {:error, :bot, changeset, _} -> {:error, changeset}
+    end
   end
 
   @doc """
@@ -34,7 +70,7 @@ defmodule Bughouse.Bots do
   end
 
   @doc """
-  Updates a bot.
+  Updates a bot. Also syncs the bot Player's display_name if changed.
   """
   def update_bot(%Bot{} = bot, attrs) do
     bot
@@ -43,10 +79,22 @@ defmodule Bughouse.Bots do
   end
 
   @doc """
-  Deletes a bot.
+  Deletes a bot and its associated Player record.
   """
   def delete_bot(%Bot{} = bot) do
-    Repo.delete(bot)
+    Multi.new()
+    |> Multi.delete(:bot, bot)
+    |> Multi.run(:delete_player, fn repo, _changes ->
+      case repo.get(Player, bot.player_id) do
+        nil -> {:ok, nil}
+        player -> repo.delete(player)
+      end
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{bot: bot}} -> {:ok, bot}
+      {:error, _op, changeset, _} -> {:error, changeset}
+    end
   end
 
   @doc """
@@ -59,9 +107,9 @@ defmodule Bughouse.Bots do
   @doc """
   Lists all bots owned by a player, ordered by name.
   """
-  def list_bots_for_owner(player_id) do
+  def list_bots_for_owner(owner_id) do
     from(b in Bot,
-      where: b.player_id == ^player_id,
+      where: b.owner_id == ^owner_id,
       order_by: [asc: b.name]
     )
     |> Repo.all()
@@ -69,6 +117,7 @@ defmodule Bughouse.Bots do
 
   @doc """
   Lists all public, active bots with their player preloaded, ordered by rating desc.
+  The preloaded `player` is the bot's game identity (is_bot: true).
   """
   def list_public_bots do
     from(b in Bot,

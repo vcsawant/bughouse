@@ -6,7 +6,12 @@ defmodule Bughouse.Schemas.Accounts.Bot do
   @foreign_key_type :binary_id
 
   schema "bots" do
+    # The bot's game identity — a Player record with is_bot: true.
+    # This is the ID used when the bot sits in a game seat.
     belongs_to :player, Bughouse.Schemas.Accounts.Player
+
+    # The human who registered/manages this bot.
+    belongs_to :owner, Bughouse.Schemas.Accounts.Player
 
     # Bot identity
     field :name, :string
@@ -49,6 +54,7 @@ defmodule Bughouse.Schemas.Accounts.Bot do
     bot
     |> cast(attrs, [
       :player_id,
+      :owner_id,
       :name,
       :display_name,
       :description,
@@ -62,7 +68,7 @@ defmodule Bughouse.Schemas.Accounts.Bot do
       :is_public,
       :is_active
     ])
-    |> validate_required([:player_id, :name, :display_name, :bot_type])
+    |> validate_required([:name, :display_name, :bot_type])
     |> validate_name()
     |> validate_inclusion(:bot_type, ["internal", "external"])
     |> validate_inclusion(:status, ["online", "offline", "in_game"])
