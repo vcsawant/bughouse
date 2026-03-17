@@ -702,14 +702,26 @@ defmodule Bughouse.Games.BughouseGameServer do
       Process.cancel_timer(ref)
     end
 
+    # Freeze clocks at their current values so they don't jump back
+    now = System.monotonic_time(:millisecond)
+    frozen_clocks = calculate_current_clocks(state, now)
+
     %{
       state
       | result: result,
         result_reason: reason,
         result_details: details,
         result_timestamp: DateTime.utc_now(),
-        # Clear all active clocks when game ends
+        # Store frozen clock values so serialize_state_for_client returns correct times
+        time_remaining_ms: frozen_clocks,
+        # Clear all active clocks and clock starts
         active_clocks: MapSet.new(),
+        clock_started_at_ms: %{
+          board_1_white: nil,
+          board_1_black: nil,
+          board_2_white: nil,
+          board_2_black: nil
+        },
         timeout_refs: %{
           board_1_white: nil,
           board_1_black: nil,

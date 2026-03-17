@@ -109,8 +109,12 @@ defmodule Bughouse.BotEngine.Server do
   end
 
   # Game over from PubSub
-  def handle_info({:game_over, _game_state}, state) do
-    Logger.info("BotEngineServer: game #{state.invite_code} over, shutting down")
+  def handle_info({:game_over, game_state}, state) do
+    Logger.info(
+      "BotEngineServer: game #{state.invite_code} over " <>
+        "(result=#{inspect(game_state[:result])}, reason=#{inspect(game_state[:result_reason])}, " <>
+        "pending_go=#{inspect(state.pending_go)})"
+    )
     send_to_engine(state.port, "quit")
     {:stop, :normal, state}
   end
@@ -304,6 +308,12 @@ defmodule Bughouse.BotEngine.Server do
   end
 
   defp execute_move(state, move_str, position) do
+    board_id = position_to_ubi_board(position)
+
+    Logger.info(
+      "BotEngine MOVE [#{state.invite_code}] board=#{board_id} pos=#{position} move=#{move_str}"
+    )
+
     result =
       if drop_move?(move_str) do
         # Drop move: "p@e4" → piece_type :p, square "e4"
@@ -317,7 +327,7 @@ defmodule Bughouse.BotEngine.Server do
 
     case result do
       :ok ->
-        :ok
+        Logger.info("BotEngine MOVE OK [#{state.invite_code}] board=#{board_id} #{move_str}")
 
       {:error, reason} ->
         board_id = position_to_ubi_board(position)
