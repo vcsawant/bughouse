@@ -7,7 +7,6 @@ defmodule Bughouse.BotMatches do
   """
 
   import Ecto.Query, warn: false
-  require Logger
 
   alias Bughouse.Repo
   alias Bughouse.Schemas.Games.{BotMatch, BotMatchGame}
@@ -26,12 +25,12 @@ defmodule Bughouse.BotMatches do
   def get_match_with_games(id) do
     BotMatch
     |> Repo.get!(id)
-    |> Repo.preload([
+    |> Repo.preload(
       bot_a: :player,
       bot_b: :player,
       current_game: [],
       bot_match_games: {from(g in BotMatchGame, order_by: [asc: g.game_number]), [:game]}
-    ])
+    )
   end
 
   def list_matches_for_player(player_id) do
@@ -47,11 +46,27 @@ defmodule Bughouse.BotMatches do
     BotMatch.changeset(match, attrs)
   end
 
+  @doc """
+  Lists a match's game rows in order, with the underlying game preloaded.
+  Cheaper than `get_match_with_games/1` when the caller only needs results.
+  """
+  def list_match_game_rows(match_id) do
+    from(mg in BotMatchGame,
+      where: mg.bot_match_id == ^match_id,
+      order_by: [asc: mg.game_number],
+      preload: [:game]
+    )
+    |> Repo.all()
+  end
+
   ## Match Lifecycle
 
   def start_match(%BotMatch{} = match) do
     match
-    |> BotMatch.changeset(%{status: "running", started_at: DateTime.utc_now() |> DateTime.truncate(:second)})
+    |> BotMatch.changeset(%{
+      status: "running",
+      started_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    })
     |> Repo.update()
     |> case do
       {:ok, match} ->
@@ -90,7 +105,14 @@ defmodule Bughouse.BotMatches do
 
   ## Game Result Recording
 
-  def record_game_result(%BotMatch{} = match, game_id, game_number, result, bot_a_team) do
+  def record_game_result(
+        %BotMatch{} = match,
+        game_id,
+        game_number,
+        result,
+        bot_a_team,
+        result_reason \\ nil
+      ) do
     Multi.new()
     |> Multi.insert(:match_game, fn _changes ->
       BotMatchGame.changeset(%BotMatchGame{}, %{
@@ -98,15 +120,21 @@ defmodule Bughouse.BotMatches do
         game_id: game_id,
         game_number: game_number,
         result: result,
+        result_reason: result_reason,
         bot_a_team: bot_a_team
       })
     end)
     |> Multi.update(:match, fn _changes ->
       counters =
         case result do
-          "bot_a_win" -> %{completed_games: match.completed_games + 1, bot_a_wins: match.bot_a_wins + 1}
-          "bot_b_win" -> %{completed_games: match.completed_games + 1, bot_b_wins: match.bot_b_wins + 1}
-          "draw" -> %{completed_games: match.completed_games + 1, draws: match.draws + 1}
+          "bot_a_win" ->
+            %{completed_games: match.completed_games + 1, bot_a_wins: match.bot_a_wins + 1}
+
+          "bot_b_win" ->
+            %{completed_games: match.completed_games + 1, bot_b_wins: match.bot_b_wins + 1}
+
+          "draw" ->
+            %{completed_games: match.completed_games + 1, draws: match.draws + 1}
         end
 
       BotMatch.changeset(match, counters)
@@ -149,6 +177,16 @@ defmodule Bughouse.BotMatches do
     )
   end
 
+  @doc """
+  Looks up the running BotMatchServer for a match, if any.
+  """
+  def get_match_server(match_id) do
+    case Registry.lookup(Bughouse.Games.Registry, {:bot_match, match_id}) do
+      [{pid, _}] -> {:ok, pid}
+      [] -> {:error, :not_found}
+    end
+  end
+
   ## Helpers
 
   @time_control_map %{
@@ -158,6 +196,6 @@ defmodule Bughouse.BotMatches do
   }
 
   def time_control_ms_to_string(ms) do
-    Map.get(@time_control_map, ms, "#{div(ms, 60_000)}min")
+    Map.get(@time_control_map, ms, "#{ms}ms")
   end
 end

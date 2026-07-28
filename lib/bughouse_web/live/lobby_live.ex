@@ -199,6 +199,10 @@ defmodule BughouseWeb.LobbyLive do
      |> redirect(to: ~p"/game/#{game.invite_code}")}
   end
 
+  def handle_info({:engine_exited, _info}, socket) do
+    {:noreply, socket}
+  end
+
   # Helper Functions
 
   defp find_my_position(game, player_id) do

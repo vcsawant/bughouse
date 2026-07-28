@@ -727,6 +727,45 @@ defmodule Bughouse.Games do
   end
 
   @doc """
+  Stops a running game server. No-op if the server is not running.
+  """
+  def stop_game_server(game_id) do
+    case get_game_server(game_id) do
+      {:ok, pid} -> Bughouse.Games.BughouseGameServer.stop(pid)
+      {:error, :not_found} -> :ok
+    end
+  end
+
+  @doc """
+  Marks an in-progress game as completed with result "aborted", so cancelled
+  matches don't leave games dangling in_progress. No-op for other statuses.
+  """
+  def abort_game(game_id) do
+    case Repo.get(Game, game_id) do
+      %Game{status: :in_progress} = game ->
+        game
+        |> Game.changeset(%{status: :completed, result: "aborted"})
+        |> Repo.update()
+
+      _ ->
+        :ok
+    end
+  end
+
+  @doc """
+  Broadcasts that a bot engine process exited before the game ended.
+  Consumed by BotMatchServer to forfeit the crashed bot's game immediately.
+  """
+  def broadcast_engine_exited(invite_code, game_id, bot_player_id, exit_status) do
+    Phoenix.PubSub.broadcast(
+      Bughouse.PubSub,
+      @topic_prefix <> invite_code,
+      {:engine_exited,
+       %{game_id: game_id, bot_player_id: bot_player_id, exit_status: exit_status}}
+    )
+  end
+
+  @doc """
   Makes a move on a running game.
   """
   def make_game_move(game_id, player_id, move_notation, position \\ nil) do

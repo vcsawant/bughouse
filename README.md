@@ -1085,6 +1085,26 @@ When a game is part of a bot match, the engine receives metadata commands before
 - `metadata time_control <ms>` — time control in milliseconds
 - `metadata game_number <n>` — current game number
 - `metadata position <positions>` — e.g. `white_A,black_B`
+- `metadata opponent <name>` — display name of the opposing bot
+
+At game end the engine receives `metadata game_result <win|loss|draw|timeout>` before
+`quit`, which is how engine-side telemetry logs are joined to website-side results.
+
+### Engine Benchmarking
+
+`mix benchmark` runs headless engine-vs-engine matches on top of the bot match system
+and reports score, Elo difference with a 95% confidence interval, and optional SPRT
+early stopping — this is the decision mechanism for comparing engine builds:
+
+```bash
+mix benchmark --engine-a ../bughouse-engine/target/release/bughouse_engine \
+              --engine-b ../bughouse-engine/target/release/bughouse_engine \
+              --games 100 --time-control 60000 --option-b QsCheckDropDepth=0
+```
+
+Results are written incrementally to `bench_results/<match_id>/results.json` with
+per-game engine logs alongside. See [bench/README.md](./bench/README.md) for full
+usage, the output format, fairness guarantees, and failure semantics.
 
 ---
 

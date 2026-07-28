@@ -18,6 +18,8 @@ defmodule Bughouse.Application do
       {DynamicSupervisor, name: Bughouse.Games.GameSupervisor, strategy: :one_for_one},
       # Dynamic supervisor for bot engine processes (Erlang Ports)
       Bughouse.BotEngine.Supervisor,
+      # Tracks engine processes by game_id so they can be stopped as a group
+      {Registry, keys: :duplicate, name: Bughouse.BotEngine.Registry},
       # Dynamic supervisor for bot match orchestrators
       {DynamicSupervisor, name: Bughouse.BotMatches.MatchSupervisor, strategy: :one_for_one},
       # Start a worker by calling: Bughouse.Worker.start_link(arg)

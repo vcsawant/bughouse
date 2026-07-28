@@ -53,9 +53,12 @@ defmodule Bughouse.BotEngine.Server do
       TeamComm.subscribe(invite_code, bot_team)
     end
 
+    # Track by game_id so all engines for a game can be stopped as a group
+    Registry.register(Bughouse.BotEngine.Registry, game_id, bot_player_id)
+
     # Load game record for match metadata + bot record for engine config
     game = Games.get_game!(game_id)
-    match_metadata = build_engine_metadata(game.match_metadata, positions)
+    match_metadata = build_engine_metadata(game, positions, bot_player_id)
 
     bot = Bughouse.Bots.get_bot_by_player_id(bot_player_id)
     engine_options = if bot, do: bot.default_options || %{}, else: %{}
@@ -126,6 +129,8 @@ defmodule Bughouse.BotEngine.Server do
         "(result=#{inspect(game_state[:result])}, reason=#{inspect(game_state[:result_reason])}, " <>
         "pending_go=#{inspect(state.pending_go)})"
     )
+
+    send_game_result_metadata(state, game_state)
     send_to_engine(state.port, "quit")
     {:stop, :normal, state}
   end
@@ -144,6 +149,11 @@ defmodule Bughouse.BotEngine.Server do
     {:noreply, state}
   end
 
+  # Engine-exit broadcast for a game (possibly our partner's engine) — ignore
+  def handle_info({:engine_exited, _info}, state) do
+    {:noreply, state}
+  end
+
   # Team communication from human teammate — forward as UBI partnermsg to engine
   def handle_info({:team_message, message}, state) do
     if message.from_player_id != state.bot_player_id and state.port != nil do
@@ -154,11 +164,14 @@ defmodule Bughouse.BotEngine.Server do
     {:noreply, state}
   end
 
-  # Port exited
+  # Port exited — the engine process died before the game ended (a crash;
+  # normal shutdown goes through the game_over → quit path instead)
   def handle_info({port, {:exit_status, code}}, %{port: port} = state) do
     Logger.warning(
       "BotEngineServer: engine exited with code #{code} for game #{state.invite_code}"
     )
+
+    Games.broadcast_engine_exited(state.invite_code, state.game_id, state.bot_player_id, code)
 
     {:stop, :normal, %{state | port: nil}}
   end
@@ -378,15 +391,31 @@ defmodule Bughouse.BotEngine.Server do
 
   ## Engine Metadata
 
-  defp build_engine_metadata(nil, _positions), do: nil
+  defp build_engine_metadata(%{match_metadata: nil}, _positions, _bot_player_id), do: nil
 
-  defp build_engine_metadata(meta, positions) when is_map(meta) do
+  defp build_engine_metadata(%{match_metadata: meta} = game, positions, bot_player_id)
+       when is_map(meta) do
     position_str =
       positions
       |> Enum.map(&position_to_ubi_position/1)
       |> Enum.join(",")
 
-    Map.put(meta, "position", position_str)
+    meta
+    |> Map.put("position", position_str)
+    |> put_opponent_metadata(game, bot_player_id)
+  end
+
+  defp put_opponent_metadata(meta, game, bot_player_id) do
+    opponent_player_id =
+      [game.board_1_white_id, game.board_1_black_id, game.board_2_white_id, game.board_2_black_id]
+      |> Enum.find(fn id -> id != nil and id != bot_player_id end)
+
+    with id when not is_nil(id) <- opponent_player_id,
+         %{} = opponent <- Bughouse.Bots.get_bot_by_player_id(id) do
+      Map.put(meta, "opponent", opponent.display_name || opponent.name)
+    else
+      _ -> meta
+    end
   end
 
   defp send_engine_metadata(%{match_metadata: nil}), do: :ok
@@ -396,6 +425,23 @@ defmodule Bughouse.BotEngine.Server do
       unless is_nil(val), do: send_to_engine(port, "metadata #{key} #{val}")
     end)
   end
+
+  # UBI §4.9: `metadata game_result <win|loss|draw|timeout>` at game end signals
+  # the engine to log its game summary. Only sent for match games.
+  defp send_game_result_metadata(%{match_metadata: nil}, _game_state), do: :ok
+  defp send_game_result_metadata(%{port: nil}, _game_state), do: :ok
+
+  defp send_game_result_metadata(state, game_state) do
+    value =
+      game_result_value(game_state[:result], game_state[:result_reason], state.bot_team)
+
+    send_to_engine(state.port, "metadata game_result #{value}")
+  end
+
+  defp game_result_value(:draw, _reason, _team), do: "draw"
+  defp game_result_value(team, _reason, team), do: "win"
+  defp game_result_value(_other, :timeout, _team), do: "timeout"
+  defp game_result_value(_other, _reason, _team), do: "loss"
 
   defp position_to_ubi_position(:board_1_white), do: "white_A"
   defp position_to_ubi_position(:board_1_black), do: "black_A"
@@ -409,7 +455,9 @@ defmodule Bughouse.BotEngine.Server do
 
   defp get_engine_path(bot) do
     cond do
-      bot && bot.engine_path && bot.engine_path != "" -> bot.engine_path
+      bot && bot.engine_path && bot.engine_path != "" ->
+        bot.engine_path
+
       true ->
         Application.get_env(:bughouse, :bot_engine)[:engine_path] ||
           raise "Bot engine path not configured. Set :bughouse, :bot_engine, :engine_path"

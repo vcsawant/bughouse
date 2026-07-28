@@ -140,8 +140,9 @@ defmodule BughouseWeb.GameReplayLive do
   end
 
   defp parse_time_control(time_control) when is_binary(time_control) do
-    # Parse formats like "10min", "5min", "3+2", etc.
+    # Parse formats like "10min", "5min", "90000ms" (benchmark games), "3+2", etc.
     case Integer.parse(time_control) do
+      {ms, "ms"} -> ms
       {minutes, "min"} -> minutes * 60 * 1000
       {minutes, _} -> minutes * 60 * 1000
       # Default: 10 minutes

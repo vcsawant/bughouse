@@ -41,6 +41,18 @@ defmodule Bughouse.BotEngine.Supervisor do
     DynamicSupervisor.terminate_child(__MODULE__, pid)
   end
 
+  @doc """
+  Stop all engine processes attached to a game. Idempotent — engines that
+  already quit (e.g. after receiving game_over) are simply no longer registered.
+  """
+  def stop_engines_for_game(game_id) do
+    for {pid, _bot_player_id} <- Registry.lookup(Bughouse.BotEngine.Registry, game_id) do
+      stop_engine(pid)
+    end
+
+    :ok
+  end
+
   @doc "Number of currently active bot engine processes."
   def active_count do
     %{active: active} = DynamicSupervisor.count_children(__MODULE__)

@@ -366,6 +366,11 @@ defmodule BughouseWeb.GameLive do
   end
 
   @impl true
+  def handle_info({:engine_exited, _info}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info({:team_message, message}, socket) do
     require Logger
 

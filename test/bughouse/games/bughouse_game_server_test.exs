@@ -154,10 +154,11 @@ defmodule Bughouse.Games.BughouseGameServerTest do
       assert state.board_1_fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
       assert state.board_2_fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 
-      # Verify clocks (5 minutes = 300,000 ms)
-      assert state.clocks.board_1_white == 300_000
+      # Verify clocks (5 minutes = 300,000 ms; active clocks may have ticked
+      # a few ms between game start and this read)
+      assert_in_delta state.clocks.board_1_white, 300_000, 100
       assert state.clocks.board_1_black == 300_000
-      assert state.clocks.board_2_white == 300_000
+      assert_in_delta state.clocks.board_2_white, 300_000, 100
       assert state.clocks.board_2_black == 300_000
 
       # Verify active clocks (both whites start)
@@ -182,6 +183,28 @@ defmodule Bughouse.Games.BughouseGameServerTest do
     test "initializes with empty move history", %{pid: pid} do
       state = TestHelpers.get_state(pid)
       assert state.last_move == nil
+    end
+
+    test "parses millisecond time controls (benchmark games)" do
+      {:ok, game} = Games.create_game(%{time_control: "2000ms"})
+
+      {:ok, p1} = Accounts.create_guest_player()
+      {:ok, p2} = Accounts.create_guest_player()
+      {:ok, p3} = Accounts.create_guest_player()
+      {:ok, p4} = Accounts.create_guest_player()
+
+      {:ok, _} = Games.join_game(game.id, p1.id, :board_1_white)
+      {:ok, _} = Games.join_game(game.id, p2.id, :board_1_black)
+      {:ok, _} = Games.join_game(game.id, p3.id, :board_2_white)
+      {:ok, _} = Games.join_game(game.id, p4.id, :board_2_black)
+
+      {:ok, _game, pid} = Games.start_game(game.id)
+      Ecto.Adapters.SQL.Sandbox.allow(Bughouse.Repo, self(), pid)
+      on_exit(fn -> if Process.alive?(pid), do: BughouseGameServer.stop(pid) end)
+
+      server_state = :sys.get_state(pid)
+      assert server_state.time_remaining_ms.board_1_white == 2000
+      assert server_state.time_remaining_ms.board_2_black == 2000
     end
   end
 

@@ -483,8 +483,14 @@ defmodule Bughouse.Games.BughouseGameServer do
   defp parse_time_control("10min"), do: 10 * 60 * 1000
 
   defp parse_time_control(other) do
-    Logger.warning("Unknown time control format: #{other}, defaulting to 5min")
-    5 * 60 * 1000
+    case Regex.run(~r/^(\d+)ms$/, other) do
+      [_, ms] ->
+        String.to_integer(ms)
+
+      nil ->
+        Logger.warning("Unknown time control format: #{other}, defaulting to 5min")
+        5 * 60 * 1000
+    end
   end
 
   # When a position hint is given (e.g. from dual bots), validate that the
