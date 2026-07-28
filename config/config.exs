@@ -13,7 +13,7 @@ config :bughouse,
 
 # Bot engine configuration
 config :bughouse, :bot_engine,
-  max_concurrent: 2,
+  max_concurrent: 10,
   game_log_path: nil
 
 # OAuth configuration (secrets loaded at runtime in config/runtime.exs)

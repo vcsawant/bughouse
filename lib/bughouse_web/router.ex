@@ -56,6 +56,9 @@ defmodule BughouseWeb.Router do
       live "/bots", BotLive, :index
       live "/bots/new", BotLive, :new
       live "/bots/:id/edit", BotLive, :edit
+      live "/matches", BotMatchLive, :index
+      live "/matches/new", BotMatchLive, :new
+      live "/matches/:id", BotMatchLive, :show
     end
   end
 
@@ -81,6 +84,15 @@ defmodule BughouseWeb.Router do
       pipe_through :browser
 
       live_dashboard "/dashboard", metrics: BughouseWeb.Telemetry
+
+      live_session :dev_tools,
+        on_mount: [
+          {BughouseWeb.UserAuth, :require_authenticated},
+          {BughouseWeb.UserAuth, :subscribe_notifications}
+        ],
+        layout: {BughouseWeb.Layouts, :app} do
+        live "/bots", BughouseWeb.DevBotLive
+      end
     end
   end
 end

@@ -23,7 +23,9 @@ defmodule Bughouse.BotEngine.Server do
     :positions,
     :engine_ready,
     :pending_go,
-    :line_buffer
+    :line_buffer,
+    :match_metadata,
+    :engine_options
   ]
 
   ## Public API
@@ -51,9 +53,16 @@ defmodule Bughouse.BotEngine.Server do
       TeamComm.subscribe(invite_code, bot_team)
     end
 
-    # Open Port to the engine binary
-    engine_path = get_engine_path()
-    engine_args = build_engine_args(game_id, bot_player_id)
+    # Load game record for match metadata + bot record for engine config
+    game = Games.get_game!(game_id)
+    match_metadata = build_engine_metadata(game.match_metadata, positions)
+
+    bot = Bughouse.Bots.get_bot_by_player_id(bot_player_id)
+    engine_options = if bot, do: bot.default_options || %{}, else: %{}
+
+    # Use bot-specific engine_path if set, otherwise fall back to app config
+    engine_path = get_engine_path(bot)
+    engine_args = build_engine_args(game_id, bot_player_id, match_metadata)
 
     port =
       Port.open({:spawn_executable, engine_path}, [
@@ -73,7 +82,9 @@ defmodule Bughouse.BotEngine.Server do
       positions: MapSet.new(positions),
       engine_ready: false,
       pending_go: nil,
-      line_buffer: ""
+      line_buffer: "",
+      match_metadata: match_metadata,
+      engine_options: engine_options
     }
 
     # Start UBI handshake
@@ -173,7 +184,9 @@ defmodule Bughouse.BotEngine.Server do
   defp handle_engine_line("", state), do: state
 
   defp handle_engine_line("ubiok", state) do
-    # Handshake complete — set up new game and check readiness
+    # Handshake complete — send options, metadata, then set up new game
+    send_engine_options(state)
+    send_engine_metadata(state)
     send_to_engine(state.port, "ubinewgame")
     send_to_engine(state.port, "isready")
     state
@@ -363,17 +376,55 @@ defmodule Bughouse.BotEngine.Server do
   defp position_to_ubi_board(position) when position in [:board_1_white, :board_1_black], do: "A"
   defp position_to_ubi_board(position) when position in [:board_2_white, :board_2_black], do: "B"
 
+  ## Engine Metadata
+
+  defp build_engine_metadata(nil, _positions), do: nil
+
+  defp build_engine_metadata(meta, positions) when is_map(meta) do
+    position_str =
+      positions
+      |> Enum.map(&position_to_ubi_position/1)
+      |> Enum.join(",")
+
+    Map.put(meta, "position", position_str)
+  end
+
+  defp send_engine_metadata(%{match_metadata: nil}), do: :ok
+
+  defp send_engine_metadata(%{match_metadata: meta, port: port}) do
+    Enum.each(meta, fn {key, val} ->
+      unless is_nil(val), do: send_to_engine(port, "metadata #{key} #{val}")
+    end)
+  end
+
+  defp position_to_ubi_position(:board_1_white), do: "white_A"
+  defp position_to_ubi_position(:board_1_black), do: "black_A"
+  defp position_to_ubi_position(:board_2_white), do: "white_B"
+  defp position_to_ubi_position(:board_2_black), do: "black_B"
+
   defp get_bot_active_position(state) do
     # Return the position the bot is currently thinking about, or the first position
     state.pending_go || Enum.at(MapSet.to_list(state.positions), 0)
   end
 
-  defp get_engine_path do
-    Application.get_env(:bughouse, :bot_engine)[:engine_path] ||
-      raise "Bot engine path not configured. Set :bughouse, :bot_engine, :engine_path"
+  defp get_engine_path(bot) do
+    cond do
+      bot && bot.engine_path && bot.engine_path != "" -> bot.engine_path
+      true ->
+        Application.get_env(:bughouse, :bot_engine)[:engine_path] ||
+          raise "Bot engine path not configured. Set :bughouse, :bot_engine, :engine_path"
+    end
   end
 
-  defp build_engine_args(game_id, bot_player_id) do
+  defp send_engine_options(%{engine_options: opts, port: port}) when map_size(opts) > 0 do
+    Enum.each(opts, fn {name, value} ->
+      send_to_engine(port, "setoption name #{name} value #{value}")
+    end)
+  end
+
+  defp send_engine_options(_state), do: :ok
+
+  defp build_engine_args(game_id, bot_player_id, match_metadata) do
     base_args = ["--game-id", game_id]
 
     case Application.get_env(:bughouse, :bot_engine)[:game_log_path] do
@@ -381,6 +432,16 @@ defmodule Bughouse.BotEngine.Server do
         base_args
 
       log_dir ->
+        # If part of a match, nest logs under match_id subdirectory
+        log_dir =
+          case match_metadata do
+            %{"match_id" => match_id} when is_binary(match_id) ->
+              Path.join(log_dir, match_id)
+
+            _ ->
+              log_dir
+          end
+
         File.mkdir_p!(log_dir)
         timestamp = Calendar.strftime(DateTime.utc_now(), "%Y%m%d-%H%M%S")
         short_id = String.slice(bot_player_id, 0, 8)

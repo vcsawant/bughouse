@@ -28,6 +28,7 @@ defmodule Bughouse.Schemas.Accounts.Bot do
     field :status, :string, default: "offline"
 
     # Engine settings
+    field :engine_path, :string
     field :config, :map, default: %{}
     field :default_options, :map, default: %{}
     field :max_concurrent_games, :integer, default: 1
@@ -61,6 +62,7 @@ defmodule Bughouse.Schemas.Accounts.Bot do
       :bot_type,
       :endpoint_base,
       :status,
+      :engine_path,
       :config,
       :default_options,
       :max_concurrent_games,

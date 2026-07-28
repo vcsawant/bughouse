@@ -63,6 +63,13 @@ defmodule Bughouse.Bots do
   def get_bot(id), do: Repo.get(Bot, id)
 
   @doc """
+  Gets a bot by its game identity player_id.
+  """
+  def get_bot_by_player_id(player_id) do
+    Repo.get_by(Bot, player_id: player_id)
+  end
+
+  @doc """
   Gets a bot by its unique name.
   """
   def get_bot_by_name(name) do

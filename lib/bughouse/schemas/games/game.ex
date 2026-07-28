@@ -26,6 +26,9 @@ defmodule Bughouse.Schemas.Games.Game do
     field :final_white_reserves, {:array, :string}
     field :final_black_reserves, {:array, :string}
 
+    # Match metadata for engine logging (set by BotMatchServer, read by BotEngine.Server)
+    field :match_metadata, :map
+
     has_many :game_players, Bughouse.Schemas.Games.GamePlayer
 
     # Player associations for preloading (using existing *_id fields)
@@ -55,7 +58,8 @@ defmodule Bughouse.Schemas.Games.Game do
       :final_board_1_fen,
       :final_board_2_fen,
       :final_white_reserves,
-      :final_black_reserves
+      :final_black_reserves,
+      :match_metadata
     ])
     |> validate_required([:invite_code, :status, :time_control])
     |> validate_inclusion(:status, [:waiting, :in_progress, :completed])

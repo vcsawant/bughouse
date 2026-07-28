@@ -1059,6 +1059,35 @@ This approach trades ~9KB of storage per game for replay simplicity and speed. A
 
 ---
 
+## Bot Match System
+
+The bot match system allows users to run automated game series between two bots for benchmarking and comparison.
+
+### How It Works
+
+1. Navigate to **Matches** in the nav bar
+2. Click **New Bot Match** and select two bots, game count, and time control
+3. The system runs games sequentially, alternating sides each game for fairness
+4. Watch live progress or come back later to see results
+
+### Architecture
+
+- **`BotMatchServer`** (GenServer) orchestrates the game loop: create game → seat bots → start → wait for result → repeat
+- Each game is a normal bughouse game using the existing `BughouseGameServer` and `BotEngine.Server` infrastructure
+- Results are tracked in `bot_matches` and `bot_match_games` tables
+- Engine metadata (UBI `metadata` command) is passed through for engine-side logging and analysis
+
+### Engine Metadata
+
+When a game is part of a bot match, the engine receives metadata commands before `ubinewgame`:
+- `metadata match_id <id>` — unique match identifier
+- `metadata total_games <n>` — total games in the series
+- `metadata time_control <ms>` — time control in milliseconds
+- `metadata game_number <n>` — current game number
+- `metadata position <positions>` — e.g. `white_A,black_B`
+
+---
+
 ## 📝 Code Organization
 
 ### Directory Structure

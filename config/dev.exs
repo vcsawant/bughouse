@@ -4,7 +4,8 @@ import Config
 config :bughouse, :bot_engine,
   engine_path:
     Path.expand("../bughouse-engine/target/debug/bughouse_engine", __DIR__ |> Path.dirname()),
-  game_log_path: Path.expand("../priv/logs/engine", __DIR__)
+  game_log_path: Path.expand("../priv/logs/engine", __DIR__),
+  max_concurrent: 10
 
 # Configure your database
 config :bughouse, Bughouse.Repo,
