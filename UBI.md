@@ -1,7 +1,7 @@
 # Universal Bughouse Interface (UBI) Protocol Specification
 
-**Version:** 1.0
-**Date:** February 21, 2025
+**Version:** 1.1
+**Date:** July 25, 2026
 **Author:** Viren Sawant
 
 ---
@@ -47,6 +47,7 @@ UBI is inspired by the Universal Chess Interface (UCI) protocol but adapted for 
 | Move Types | Regular only | Regular + drops |
 | Clocks | 2 (white, black) | 4 (white_A, black_A, white_B, black_B) |
 | Position Updates | Incremental (with moves) | Full state (both boards + all clocks) |
+| Time Management | GUI supplies limits per `go` | Engine-driven from full clock state |
 | Team Play | N/A | Optional team messages |
 | Hash Tables | Position only | Position + reserves |
 
@@ -83,7 +84,7 @@ The GUI handles:
 - Routing team messages between partners
 - Game state and flow management
 
-This separation of concerns simplifies engine implementation and testing.
+This separation of concerns simplifies engine implementation and testing. There is deliberately no capability negotiation: like a UCI engine, a UBI engine is never told what role it plays. `go` commands mean "evaluate this position and answer with a move" — the GUI decides what to do with the answer.
 
 ### 2.2 Full-State Updates
 
@@ -101,6 +102,10 @@ Each board (A and B) has independent search state:
 - **SEARCHING**: Actively calculating best move
 
 An engine can search one or both boards simultaneously.
+
+### 2.4 Time Is First-Class
+
+UBI engines are built to *play* bughouse, not merely evaluate it. Bughouse is won and lost on the clock: a team can be checkmated on one board because the other board fed pieces too slowly, and "sitting" (declining to move) is a legitimate strategic device. UCI treats time as a per-search limit supplied with `go`; UBI instead treats the four-clock state as part of the game state, delivered with every `position` update. Engines are expected to own their time management — deciding how long to think from the full clock picture (their own clock, their direct opponent's, and both clocks on the partner board).
 
 ---
 
@@ -137,7 +142,8 @@ An engine can search one or both boards simultaneously.
 | `position <bfen_a> \| <bfen_b> clock <wA> <bA> <wB> <bB>` | Set complete game state |
 | `partnermsg <type> [params]` | Forward partner's team message |
 | `go board <A\|B> [searchparams]` | Start search on a board |
-| `stop [board <A\|B>]` | Stop search |
+| `stop [board <A\|B>]` | Cancel search |
+| `metadata <key> <value>` | Attach match/game metadata (optional) |
 | `quit` | Terminate engine |
 
 ### 4.1 `ubi`
@@ -217,9 +223,11 @@ setoption name TeamMessageMode value full
 ```
 
 **Notes:**
-- Must be sent before `ubinewgame`
+- Typically sent after `ubiok` and before `ubinewgame`
+- Engines MAY accept `setoption` at any time, including mid-game — this supports runtime tuning and benchmarking. An engine that cannot apply an option mid-game should ignore it rather than error
 - Values must match the option's type and constraints
 - For button-type options, no value is needed
+- Engines should silently ignore unknown option names
 
 **Standard Option Types:**
 
@@ -350,30 +358,28 @@ go board <A|B> [searchparams]
 **Parameters:**
 - `board <A|B>`: Which board to analyze (required)
 
-**Search Parameters (all optional):**
+**Time management:** The core form is a bare `go board <X>`. UBI engines own their time management (see Section 2.4): the engine decides how long to think using the four clock values from the most recent `position` command. This is a deliberate departure from UCI, where the GUI supplies time limits with every `go`. A well-behaved engine should move faster when short on time, may invest more when holding a time advantage over its direct opponent, and should account for the partner board's clocks when both boards are under its control.
+
+**Search Parameters (optional hints):**
 
 | Parameter | Description |
 |-----------|-------------|
 | `movetime <ms>` | Search for exactly this duration |
-| `wtime <ms>` | White's remaining time on this board |
-| `btime <ms>` | Black's remaining time on this board |
-| `winc <ms>` | White's increment per move |
-| `binc <ms>` | Black's increment per move |
 | `depth <n>` | Search to specified depth in plies |
 | `nodes <n>` | Search up to this many nodes |
 | `infinite` | Search until `stop` command |
 
 **Examples:**
 ```
+go board A
+go board B
 go board A movetime 3000
-go board B wtime 180000 btime 175000 winc 0 binc 0
 go board A depth 12
-go board B infinite
 ```
 
 **Notes:**
-- Multiple search parameters can be combined
-- Engine should use whichever limit is reached first
+- Search parameters are hints intended for analysis, testing, and benchmarking. Engines MAY ignore them in normal play — the clock state from `position` is the authoritative time source
+- If an engine honors search parameters, whichever limit is reached first ends the search
 - Transitions specified board from IDLE to SEARCHING state
 - Multiple `go` commands can be active simultaneously (one per board)
 
@@ -381,7 +387,7 @@ go board B infinite
 
 ### 4.8 `stop`
 
-**Description:** Stop calculating immediately.
+**Description:** Cancel the pending search on one or both boards.
 
 **Format:**
 ```
@@ -389,19 +395,65 @@ stop [board <A|B>]
 ```
 
 **Variants:**
-- `stop` — Stop all active searches (both boards)
-- `stop board A` — Stop search on board A only
-- `stop board B` — Stop search on board B only
+- `stop` — Cancel all active searches (both boards)
+- `stop board A` — Cancel search on board A only
+- `stop board B` — Cancel search on board B only
 
-**Response:** Engine should send `bestmove` with the best move found so far.
+**Response:** None. The engine aborts the search for the specified board(s) and transitions them to IDLE **without sending `bestmove`**. This matches the internal-abort behavior in Section 7.3: a cancelled search never produces a move. If the GUI wants a move after cancelling, it sends a fresh `go`.
 
 **Notes:**
-- Engine must respond quickly (within a few milliseconds)
-- If no search is active for the specified board, command is ignored
+- Engine must process the cancellation quickly (within a few milliseconds)
+- If no search is active for the specified board, the command is ignored
+- Typical uses: invalidating a pending `go` before a position update, or ending an `infinite` analysis session
 
 ---
 
-### 4.9 `quit`
+### 4.9 `metadata`
+
+**Description:** Attach arbitrary key-value metadata to the engine instance. Metadata is purely informational — engines store it for logging and analysis but do not act on it.
+
+**Format:**
+```
+metadata <key> <value>
+```
+
+Keys and values are freeform strings; the engine does not validate them. Metadata persists for the lifetime of the engine process. Each `metadata` command sets or overwrites the value for that key.
+
+**Examples:**
+```
+metadata match_id bench_20260318_001
+metadata total_games 100
+metadata time_control 120000
+metadata opponent baseline_stable_v1
+metadata game_number 42
+metadata position white_A,black_B
+```
+
+**Conventional Keys:**
+
+These keys are not required, but using them enables consistent log analysis across different GUIs:
+
+| Key | Description | Example |
+|-----|-------------|---------|
+| `match_id` | Unique identifier for a batch of games | `bench_20260318_001` |
+| `total_games` | Number of games in the match | `100` |
+| `time_control` | Starting time in milliseconds | `120000` |
+| `opponent` | Opposing team identifier | `baseline_stable_v1` |
+| `game_number` | Current game number in the match | `42` |
+| `position` | Board seats this engine plays (comma-separated) | `white_A,black_B` |
+| `game_result` | Outcome of the game | `win`, `loss`, `draw`, `timeout` |
+
+**Game Result:** When the GUI sends `metadata game_result <value>`, the engine should log a game summary. This is the signal that the game has ended.
+
+**Engine behavior:**
+- Store all metadata key-value pairs
+- Include metadata in structured log output (game start/end markers)
+- Do not change search, evaluation, or move selection based on metadata
+- Gracefully handle unknown keys (store and log them like any other)
+
+---
+
+### 4.10 `quit`
 
 **Description:** Quit the engine as soon as possible.
 
@@ -565,7 +617,8 @@ bestmove board A (none)
 ```
 
 **Notes:**
-- Sent when search completes (time limit, depth reached, or `stop` command)
+- Sent when a search completes normally (time limit, depth reached, or other search-parameter limit)
+- Never sent in response to `stop` or an internal abort (see Sections 4.8 and 7.3)
 - Automatically transitions that board from SEARCHING to IDLE
 - Engine should stop thinking about that board after sending `bestmove`
 - Other board (if searching) continues unaffected
@@ -621,6 +674,8 @@ r@a1    — Drop rook at a1
 q@d5    — Drop queen at d5
 ```
 
+**Note:** UBI mandates lowercase piece letters for drops. This differs from the crazyhouse UCI convention (e.g. Fairy-Stockfish, Lichess), which uses uppercase (`N@f3`). GUIs bridging to crazyhouse tooling should normalize case.
+
 **Legality Requirements:**
 1. Piece must exist in player's reserve
 2. Target square must be empty
@@ -656,9 +711,9 @@ Each board (A and B) maintains independent state:
 
 ```
 IDLE → SEARCHING    go board <X>
-SEARCHING → IDLE    bestmove board <X> (automatic)
-SEARCHING → IDLE    stop [board <X>] (manual interrupt)
-SEARCHING → IDLE    Internal abort due to position invalidation
+SEARCHING → IDLE    bestmove board <X> (automatic, search completed)
+SEARCHING → IDLE    stop [board <X>] (manual cancel — no bestmove)
+SEARCHING → IDLE    Internal abort due to position invalidation (no bestmove)
 ```
 
 ### 7.3 Position Updates During Search
@@ -682,13 +737,17 @@ When engine receives `position` command while searching:
 - Do NOT send `bestmove`
 - Wait for next `go` command
 
-### 7.4 Multiple Simultaneous Searches
+### 7.4 Pondering
+
+Engines MAY think on the opponent's time. Because every `position` command delivers the full game state, a pondering engine simply keeps analyzing the current position between `go` commands and answers from its accumulated work when `go` arrives. No `ponderhit` mechanism is needed: a `position` update that changes a board invalidates any pondering on it (Section 7.3), and pondering produces no output until a `go` is answered.
+
+### 7.5 Multiple Simultaneous Searches
 
 An engine can search both boards simultaneously:
 
 ```
-go board A movetime 3000
-go board B movetime 3000
+go board A
+go board B
 ```
 
 **State:** Both A and B are SEARCHING
@@ -702,7 +761,7 @@ bestmove board A e2e4
 
 Engine continues calculating for board B independently.
 
-### 7.5 Example State Transitions
+### 7.6 Example State Transitions
 
 ```
 Initial: A=IDLE, B=IDLE
@@ -720,7 +779,7 @@ State: A=SEARCHING, B=SEARCHING
 Engine → bestmove board B d2d4
 State: A=SEARCHING, B=IDLE
 
-GUI → stop board A
+GUI → stop board A        (no bestmove will follow)
 State: A=IDLE, B=IDLE
 ```
 
@@ -837,7 +896,7 @@ Engine → GUI: readyok
 
 # Opening position
 GUI → Engine: position startpos | startpos clock 180000 180000 180000 180000
-GUI → Engine: go board A movetime 3000
+GUI → Engine: go board A
 
 Engine → GUI: info board A depth 1 nodes 20 score cp 15
 Engine → GUI: info board A depth 8 nodes 15000 score cp 30
@@ -850,14 +909,14 @@ GUI → Engine: position rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR[] b KQk
 # Partner sends a message
 GUI → Engine: partnermsg need n urgency medium
 
-GUI → Engine: go board A movetime 3000
+GUI → Engine: go board A
 Engine → GUI: info board A depth 12 score cp 20
 Engine → GUI: teammsg material +50
 Engine → GUI: bestmove board A g1f3
 
 # Later — using reserves
 GUI → Engine: position r1bqkb1r/pp1p1ppp/2n2n2/2p1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R[NNPp] w KQkq - 0 6 | rnbqkb1r/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR[Qbpp] b KQkq - 0 3 clock 165000 168000 170000 172000
-GUI → Engine: go board A movetime 2500
+GUI → Engine: go board A
 
 Engine → GUI: info board A depth 11 score cp 55 pv n@e5 reserve_value 300
 Engine → GUI: teammsg need b urgency high
@@ -886,8 +945,8 @@ Engine → GUI: readyok
 GUI → Engine: position startpos | startpos clock 180000 180000 180000 180000
 
 # Engine thinks about both boards simultaneously
-GUI → Engine: go board A movetime 3000
-GUI → Engine: go board B movetime 3000
+GUI → Engine: go board A
+GUI → Engine: go board B
 
 # Engine coordinates between boards
 Engine → GUI: info board A depth 8 score cp 30
@@ -898,8 +957,8 @@ Engine → GUI: bestmove board B d2d4
 # After opponents' moves on both boards
 GUI → Engine: position rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR[] w KQkq - 0 2 | rnbqkb1r/pppp1ppp/5n2/4p3/3P4/8/PPP1PPPP/RNBQKBNR[] w KQkq - 0 2 clock 177000 177000 177000 177000
 
-GUI → Engine: go board A movetime 3000
-GUI → Engine: go board B movetime 3000
+GUI → Engine: go board A
+GUI → Engine: go board B
 
 Engine → GUI: info board A depth 10 score cp 35
 Engine → GUI: info board B depth 10 score cp 30
@@ -909,8 +968,8 @@ Engine → GUI: bestmove board B b1c3
 # Later — with reserves
 GUI → Engine: position r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R[Np] w KQkq - 4 5 | rnbqkb1r/ppp2ppp/4pn2/3p4/2PP4/2N5/PP2PPPP/R1BQKBNR[P] b KQkq - 0 4 clock 165000 168000 170000 172000
 
-GUI → Engine: go board A movetime 2500
-GUI → Engine: go board B movetime 2500
+GUI → Engine: go board A
+GUI → Engine: go board B
 
 Engine → GUI: info board A depth 11 reserve_value 300
 Engine → GUI: info board B depth 11 reserve_value 100
@@ -918,6 +977,31 @@ Engine → GUI: bestmove board A n@e5
 Engine → GUI: bestmove board B e6e5
 
 GUI → Engine: quit
+```
+
+### 9.3 Benchmarking Session with Metadata
+
+```
+# Match-level metadata (set once)
+GUI → Engine: metadata match_id bench_20260318_001
+GUI → Engine: metadata total_games 100
+GUI → Engine: metadata opponent baseline_stable_v1
+GUI → Engine: metadata time_control 120000
+
+# Game-level metadata (set before each game)
+GUI → Engine: metadata game_number 1
+GUI → Engine: metadata position white_A,black_B
+GUI → Engine: ubinewgame
+GUI → Engine: isready
+Engine → GUI: readyok
+# ... position + go commands ...
+GUI → Engine: metadata game_result win
+
+# Next game
+GUI → Engine: metadata game_number 2
+GUI → Engine: metadata position black_A,white_B
+GUI → Engine: ubinewgame
+# ...
 ```
 
 ---
@@ -955,12 +1039,18 @@ def generate_moves(position, reserves):
 
 #### Time Management
 ```python
-def calculate_search_time(my_time, opp_time, increment, move_number):
-    # Consider both board clocks if dual-board
-    # Account for faster pace of bughouse
-    # Reserve time for critical moments
-    base_time = my_time / 40  # Rough heuristic
-    return min(base_time, my_time * 0.05)  # Don't use more than 5% of remaining time
+def calculate_search_time(clocks, board, side):
+    # Engine-driven: derive budget from the full clock state.
+    my_time = clocks[board][side]
+    opp_time = clocks[board][other(side)]
+
+    if my_time < 3500:                 # emergency — answer instantly
+        return 50
+    if my_time < 10000:                # low time — play fast
+        return min(my_time / 40, 500)
+    if my_time > opp_time + 15000:     # time advantage — invest it
+        return min(my_time / 20, 4000)
+    return min(my_time / 30, 2000)     # normal pace
 ```
 
 #### Team Messages
@@ -998,6 +1088,7 @@ def should_send_message(position, reserves, partner_position):
 - Can send for one or both boards
 - Track which boards are searching
 - After `bestmove board X`, that board is IDLE
+- `stop` cancels a search without producing a move — do not wait for `bestmove` after sending it
 - Don't send `stop` after `bestmove` (redundant)
 
 #### Move Handling
@@ -1046,11 +1137,13 @@ function onEngineTeamMsg(engine, msg) {
 | Aspect | UCI | UBI |
 |--------|-----|-----|
 | **Position** | `position [startpos\|fen <fen>] [moves ...]` | `position <bfen_a> \| <bfen_b> clock <wA> <bA> <wB> <bB>` |
-| **Go** | `go [searchparams]` | `go board <A\|B> [searchparams]` |
+| **Go** | `go [searchparams]` | `go board <A\|B> [searchparams]` — params optional, clocks authoritative |
+| **Stop** | `stop` → engine sends `bestmove` | `stop [board <A\|B>]` → search cancelled, no `bestmove` |
 | **Bestmove** | `bestmove <move> [ponder <move>]` | `bestmove board <A\|B> <move>` |
 | **Info** | `info [key value]*` | `info board <A\|B> [key value]*` |
 | **State** | Single global (IDLE/SEARCHING) | Per-board (A and B independent) |
 | **Team play** | N/A | `teammsg` / `partnermsg` |
+| **Metadata** | N/A | `metadata <key> <value>` |
 
 ---
 
@@ -1064,6 +1157,9 @@ A: Check the BFEN's active color field. The position tells you whose turn it is.
 
 **Q: What if I receive `go` for both boards simultaneously?**
 A: You're a dual-board engine. Coordinate your thinking and send two `bestmove` commands.
+
+**Q: Why doesn't the GUI tell me how long to think?**
+A: It can (via optional `go` hints), but it doesn't have to. Time management is a core engine skill in bughouse, so UBI delivers the full four-clock state with every `position` and lets the engine decide. See Section 2.4.
 
 **Q: Can drops give check?**
 A: Yes! Drops are regular moves and can check or attack the king.
@@ -1097,8 +1193,9 @@ ubinewgame
 position <bfen_a> | <bfen_b> clock <wA> <bA> <wB> <bB>
 position startpos | startpos clock <wA> <bA> <wB> <bB>
 partnermsg <type> [params]
-go board <A|B> [movetime <ms>] [wtime <ms>] [btime <ms>] [depth <n>] [nodes <n>] [infinite]
+go board <A|B> [movetime <ms>] [depth <n>] [nodes <n>] [infinite]
 stop [board <A|B>]
+metadata <key> <value>
 quit
 ```
 
@@ -1128,13 +1225,15 @@ Drops:   n@f3, p@e4, q@d5, b@c4
 ```
 IDLE → SEARCHING: go board X
 SEARCHING → IDLE: bestmove board X (automatic)
-SEARCHING → IDLE: stop [board X] (manual)
+SEARCHING → IDLE: stop [board X] (manual cancel, no bestmove)
+SEARCHING → IDLE: internal abort on position invalidation (no bestmove)
 ```
 
 ---
 
 ## Version History
 
+- **v1.1** (2026-07-25) — Added `metadata` command (§4.9); `stop` no longer elicits `bestmove`, aligning with the internal-abort model in §7.3; `go` search parameters downgraded to optional hints — engine-driven time management from the four-clock state is authoritative (§2.4, §4.7); `setoption` permitted mid-game for runtime tuning; documented pondering model (§7.4); noted lowercase drop-notation divergence from crazyhouse UCI (§6.2)
 - **v1.0** (2025-02-21) — Atomic `position` command (both boards + clocks), formal search state model, removed separate `clock` command and `moves` list, added `bestmove (none)`, removed `ponder`
 - **v0.2** (2025-02-21) — Drop checkmate legality, BFEN 2.0 alignment
 - **v0.1** (2025-02-04) — Initial specification
