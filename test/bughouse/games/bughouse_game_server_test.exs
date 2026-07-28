@@ -154,11 +154,22 @@ defmodule Bughouse.Games.BughouseGameServerTest do
       assert state.board_1_fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
       assert state.board_2_fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 
-      # Verify clocks (5 minutes = 300,000 ms; active clocks may have ticked
-      # a few ms between game start and this read)
-      assert_in_delta state.clocks.board_1_white, 300_000, 100
+      # Verify initial time allocation (5 minutes = 300,000 ms) via the server's
+      # internal state — deterministic, unlike the live clocks below
+      server_state = :sys.get_state(pid)
+
+      assert server_state.time_remaining_ms == %{
+               board_1_white: 300_000,
+               board_1_black: 300_000,
+               board_2_white: 300_000,
+               board_2_black: 300_000
+             }
+
+      # The serialized clocks are computed live: the active clocks (whites) have
+      # been ticking since game start, so only bound them loosely
+      assert state.clocks.board_1_white in 290_000..300_000
       assert state.clocks.board_1_black == 300_000
-      assert_in_delta state.clocks.board_2_white, 300_000, 100
+      assert state.clocks.board_2_white in 290_000..300_000
       assert state.clocks.board_2_black == 300_000
 
       # Verify active clocks (both whites start)

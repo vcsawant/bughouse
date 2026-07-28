@@ -15,9 +15,9 @@ defmodule Bughouse.GamesTest do
       assert game.status == :waiting
     end
 
-    test "defaults to 10min time control" do
+    test "defaults to 5min time control" do
       {:ok, game} = Games.create_game()
-      assert game.time_control == "10min"
+      assert game.time_control == "5min"
     end
 
     test "all player positions are nil" do
