@@ -341,8 +341,8 @@ defmodule BughouseWeb.BotLive do
           </div>
         </div>
       </div>
-
-      <!-- Connection Settings -->
+      
+    <!-- Connection Settings -->
       <div class="card bg-base-200">
         <div class="card-body">
           <h2 class="card-title text-lg">Connection</h2>
@@ -395,8 +395,8 @@ defmodule BughouseWeb.BotLive do
           <% end %>
         </div>
       </div>
-
-      <!-- Engine Settings -->
+      
+    <!-- Engine Settings -->
       <div class="card bg-base-200">
         <div class="card-body">
           <h2 class="card-title text-lg">Engine Settings</h2>
@@ -504,8 +504,8 @@ defmodule BughouseWeb.BotLive do
           </div>
         </div>
       </div>
-
-      <!-- Visibility -->
+      
+    <!-- Visibility -->
       <div class="card bg-base-200">
         <div class="card-body">
           <h2 class="card-title text-lg">Visibility</h2>
@@ -520,8 +520,8 @@ defmodule BughouseWeb.BotLive do
           </label>
         </div>
       </div>
-
-      <!-- Submit -->
+      
+    <!-- Submit -->
       <div class="flex justify-end gap-2">
         <.link navigate={~p"/bots"} class="btn btn-ghost">Cancel</.link>
         <button type="submit" class="btn btn-primary" phx-disable-with="Saving...">

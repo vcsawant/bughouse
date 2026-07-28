@@ -21,7 +21,12 @@ defmodule Mix.Tasks.BotTestServer do
     # Allow overriding engine path via CLI arg: mix bot_test_server /path/to/engine
     if engine_override = List.first(args) do
       current = Application.get_env(:bughouse, :bot_engine) || []
-      Application.put_env(:bughouse, :bot_engine, Keyword.put(current, :engine_path, engine_override))
+
+      Application.put_env(
+        :bughouse,
+        :bot_engine,
+        Keyword.put(current, :engine_path, engine_override)
+      )
     end
 
     port = 4040

@@ -431,8 +431,11 @@ defmodule BughouseWeb.BotMatchLive do
       </div>
 
       <%= if @match.status == "running" do %>
-        <button phx-click="cancel_match" class="btn btn-outline btn-error btn-sm"
-                data-confirm="Cancel this match?">
+        <button
+          phx-click="cancel_match"
+          class="btn btn-outline btn-error btn-sm"
+          data-confirm="Cancel this match?"
+        >
           Cancel Match
         </button>
       <% end %>
@@ -520,7 +523,10 @@ defmodule BughouseWeb.BotMatchLive do
                 </td>
                 <td class="text-sm opacity-70">{game.bot_a_team}</td>
                 <td>
-                  <.link navigate={~p"/game/view/#{game.game.invite_code}"} class="btn btn-ghost btn-xs">
+                  <.link
+                    navigate={~p"/game/view/#{game.game.invite_code}"}
+                    class="btn btn-ghost btn-xs"
+                  >
                     Replay
                   </.link>
                 </td>

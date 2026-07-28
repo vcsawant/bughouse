@@ -158,7 +158,9 @@ defmodule BughouseWeb.DevBotLive do
             </div>
 
             <div class="form-control">
-              <label class="label"><span class="label-text">Engine Path (optional — falls back to app config)</span></label>
+              <label class="label">
+                <span class="label-text">Engine Path (optional — falls back to app config)</span>
+              </label>
               <input
                 type="text"
                 name="bot[engine_path]"
@@ -180,7 +182,9 @@ defmodule BughouseWeb.DevBotLive do
             </div>
 
             <div class="form-control">
-              <label class="label"><span class="label-text">Default Options (JSON — sent as UBI setoption)</span></label>
+              <label class="label">
+                <span class="label-text">Default Options (JSON — sent as UBI setoption)</span>
+              </label>
               <input
                 type="text"
                 name="bot[default_options]"
@@ -216,7 +220,11 @@ defmodule BughouseWeb.DevBotLive do
                 <td class="font-mono text-sm">{bot.name}</td>
                 <td>{bot.display_name}</td>
                 <td class="font-mono text-xs max-w-48 truncate">{bot.engine_path || "(default)"}</td>
-                <td class="font-mono text-xs">{if bot.default_options && map_size(bot.default_options) > 0, do: Jason.encode!(bot.default_options), else: "—"}</td>
+                <td class="font-mono text-xs">
+                  {if bot.default_options && map_size(bot.default_options) > 0,
+                    do: Jason.encode!(bot.default_options),
+                    else: "—"}
+                </td>
                 <td class="flex gap-1">
                   <button phx-click="edit" phx-value-id={bot.id} class="btn btn-ghost btn-xs">
                     Edit

@@ -26,8 +26,10 @@ defmodule Bughouse.Repo.Migrations.CreateBotMatches do
 
     create table(:bot_match_games, primary_key: false) do
       add :id, :binary_id, primary_key: true
+
       add :bot_match_id, references(:bot_matches, type: :binary_id, on_delete: :delete_all),
         null: false
+
       add :game_id, references(:games, type: :binary_id), null: false
       add :game_number, :integer, null: false
       add :result, :string, null: true
