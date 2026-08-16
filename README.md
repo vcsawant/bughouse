@@ -214,10 +214,10 @@ The connection uses the [UBI protocol](./UBI.md) over WebSocket.
 ### Technology Stack
 
 **Backend:**
-- **Elixir 1.14+** - Functional language, excellent for concurrent systems
-- **Phoenix 1.7+** - Web framework with native WebSocket support
+- **Elixir 1.15+** - Functional language, excellent for concurrent systems (prod builds on 1.20/OTP 29)
+- **Phoenix 1.8+** - Web framework with native WebSocket support
 - **Phoenix LiveView** - Real-time, server-rendered UI without JavaScript frameworks
-- **PostgreSQL 14+** - Primary database for game state, users, history
+- **PostgreSQL 16+** - Primary database for game state, users, history (PostgreSQL 14 is deprecated; local dev runs 18)
 - **PubSub** - Real-time message broadcasting between players
 
 **Frontend:**
@@ -702,9 +702,9 @@ flyctl ssh console      # Shell into the running VM
 
 ### Prerequisites
 
-- Elixir 1.14+ 
+- Elixir 1.15+ 
 - Erlang/OTP 25+
-- PostgreSQL 14+
+- PostgreSQL 16+ (14 is deprecated/EOL-bound; local dev uses Homebrew `postgresql@18`)
 - Node.js 18+ (for asset compilation)
 
 ### Installation

@@ -1,7 +1,7 @@
 # =============================================================================
 # Stage 1: Build the Rust bughouse engine
 # =============================================================================
-FROM rust:1.93-slim-bookworm AS rust-builder
+FROM rust:1.97.1-slim-bookworm AS rust-builder
 
 RUN apt-get update -y && apt-get install -y git pkg-config && \
     rm -rf /var/lib/apt/lists/*
@@ -17,7 +17,7 @@ RUN cargo build --release
 # =============================================================================
 # Stage 2: Build the Elixir/Phoenix release
 # =============================================================================
-FROM hexpm/elixir:1.18.3-erlang-26.2.5.8-debian-bookworm-20260202-slim AS elixir-builder
+FROM hexpm/elixir:1.20.3-erlang-29.0.5-debian-bookworm-20260803-slim AS elixir-builder
 
 RUN apt-get update -y && \
     apt-get install -y build-essential git curl && \
@@ -62,7 +62,7 @@ RUN mix release
 # =============================================================================
 # Stage 3: Production runner
 # =============================================================================
-FROM debian:bookworm-20260202-slim AS runner
+FROM debian:bookworm-20260803-slim AS runner
 
 RUN apt-get update -y && \
     apt-get install -y libstdc++6 openssl libncurses5 locales ca-certificates && \
